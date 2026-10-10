@@ -4,6 +4,7 @@ import { ClockProvider } from '../date/clock';
 import { CalendarPage } from '../features/calendar/CalendarPage';
 import { CharacterPage } from '../features/character/CharacterPage';
 import { InsightsPage } from '../features/insights/InsightsPage';
+import { JournalEntryPage } from '../features/journal/JournalEntryPage';
 import { JournalPage } from '../features/journal/JournalPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { TodayPage } from '../features/today/TodayPage';
@@ -28,6 +29,7 @@ const routes: RouteObject[] = [
       { path: 'goals/:goalId', element: <GoalPage /> },
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'journal', element: <JournalPage /> },
+      { path: 'journal/:entryId', element: <JournalEntryPage /> },
       { path: 'character', element: <CharacterPage /> },
       { path: 'insights', element: <InsightsPage /> },
       { path: 'settings', element: <SettingsPage /> },
