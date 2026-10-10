@@ -241,4 +241,15 @@ describe('plans and goals', () => {
     expect(next.history.map((h) => h.intention)).toEqual(['Ship the habits screen']);
     expect(await db.periodDirections.count()).toBe(1);
   });
+
+  it('saves a weekly review without touching the week\'s intention', async () => {
+    const base = { kind: 'week' as const, periodKey: '2026-10-05', startDate: '2026-10-05', endDate: '2026-10-11' };
+    await repo.saveDirection({ ...base, intention: 'Close two deals' });
+    const r = await repo.saveReview({ ...base, review: 'Good week', blockers: 'Too many meetings' });
+    expect(r).toMatchObject({ intention: 'Close two deals', review: 'Good week', blockers: 'Too many meetings' });
+    expect(r.reviewedAt).toBeTruthy();
+    const again = await repo.saveReview({ ...base, review: 'Great week', blockers: '' });
+    expect(again.reviewedAt).toBe(r.reviewedAt);
+    expect(again.history.at(-1)?.blockers).toBe('Too many meetings');
+  });
 });

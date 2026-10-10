@@ -241,10 +241,14 @@ export interface PeriodDirection {
   intention: string;
   desiredOutcome: string;
   review: string;
+  /** Weekly/monthly review: what got in the way. Absent on records saved before stage 4. */
+  blockers?: string;
+  /** Set the first time a written weekly/monthly review is saved. */
+  reviewedAt?: Instant | null;
   updatedAt: Instant;
   version: number;
   /** Earlier wordings, newest last; bounded. */
-  history: { at: Instant; intention: string; desiredOutcome: string; review: string }[];
+  history: { at: Instant; intention: string; desiredOutcome: string; review: string; blockers?: string }[];
 }
 
 /** Small singleton records live in one key-value table. */

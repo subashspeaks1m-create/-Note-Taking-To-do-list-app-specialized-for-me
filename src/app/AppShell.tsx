@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { asset } from './asset';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
 import { APP_NAME } from '../domain/config';
+import { formatShort } from '../date/localDate';
+import { periodRange } from '../domain/stats';
+import { useReportInbox, type ReportInbox } from '../features/insights/reportInbox';
+import { useProfile } from '../storage/StorageProvider';
 import { useDisplayPrefs } from './displayPrefs';
 
 /** Which build stage this preview shows; the note reappears for each new stage. */
-const PREVIEW_STAGE = 3;
+const PREVIEW_STAGE = 4;
 
 interface Destination {
   to: string;
@@ -29,6 +33,7 @@ export function AppShell() {
   const { prefs, setPref } = useDisplayPrefs();
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
+  const inbox = useReportInbox();
 
   // Move focus to the page on navigation so keyboard and screen-reader users land in the content.
   const firstRender = useRef(true);
@@ -45,25 +50,53 @@ export function AppShell() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <Rail />
+      <Rail inbox={inbox} />
       <main id="main" ref={mainRef} tabIndex={-1} className="shell__main">
         {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
             <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
-            <span>Visions, goals, daily habits and the mind map are live. Streaks and reports come next in stage 4; XP and suits in stage 5.</span>
+            <span>Calendar, journal search, streaks, "you vs past you" and weekly/monthly reports are live. XP, suits and transformations come in stage 5.</span>
             <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>
           </div>
         )}
+        {!location.pathname.startsWith('/insights') && <ReportReady inbox={inbox} />}
         <Outlet />
       </main>
-      <BottomBar />
+      <BottomBar inbox={inbox} />
     </div>
   );
 }
 
-function Rail() {
+/** "Your report is ready": shown on every page except Insights until opened or dismissed. */
+function ReportReady({ inbox }: { inbox: ReportInbox }) {
+  const profile = useProfile();
+  const weekStart = profile.weekStart ?? 'monday';
+  const item = inbox.week.isNew ? { kind: 'week' as const, ...inbox.week } : inbox.month.isNew ? { kind: 'month' as const, ...inbox.month } : null;
+  if (!item) return null;
+  const range = periodRange(item.kind, item.anchor, weekStart);
+  const label =
+    item.kind === 'week'
+      ? `week of ${formatShort(range.start)} – ${formatShort(range.end)}`
+      : new Date(`${range.start}T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+  return (
+    <div className="report-ready" role="status">
+      <Icon name="insights" size={20} />
+      <p className="report-ready__text">
+        <strong>Your {item.kind === 'week' ? 'weekly' : 'monthly'} report is ready.</strong> Growth, daily activity and mistakes for the {label}.
+      </p>
+      <Link to={`/insights?tab=${item.kind}&p=${item.anchor}`} className="btn btn--primary btn--sm">
+        Open report
+      </Link>
+      <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss" onClick={() => inbox.markSeen(item.key)}>
+        <Icon name="close" size={16} />
+      </button>
+    </div>
+  );
+}
+
+function Rail({ inbox }: { inbox: ReportInbox }) {
   const { prefs, setPref } = useDisplayPrefs();
   return (
     <nav className="rail" aria-label="Main">
@@ -79,6 +112,7 @@ function Rail() {
                 <Icon name={d.icon} size={22} />
               </span>
               <span className="rail__label">{d.label}</span>
+              {d.to === '/insights' && inbox.unseen > 0 && <span className="nav-badge" aria-label="New report" />}
             </NavLink>
           </li>
         ))}
@@ -97,7 +131,7 @@ function Rail() {
   );
 }
 
-function BottomBar() {
+function BottomBar({ inbox }: { inbox: ReportInbox }) {
   const location = useLocation();
   // The sheet belongs to the route it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
@@ -143,6 +177,7 @@ function BottomBar() {
         >
           <Icon name="more" size={22} />
           <span>More</span>
+          {inbox.unseen > 0 && <span className="nav-badge" aria-label="New report" />}
         </button>
       </nav>
       {open && (
@@ -163,6 +198,7 @@ function BottomBar() {
                   <NavLink to={d.to} className="sheet__link">
                     <Icon name={d.icon} size={22} />
                     <span>{d.label}</span>
+                    {d.to === '/insights' && inbox.unseen > 0 && <span className="new-dot">New</span>}
                     <Icon name="chevronRight" size={18} className="sheet__chev" />
                   </NavLink>
                 </li>

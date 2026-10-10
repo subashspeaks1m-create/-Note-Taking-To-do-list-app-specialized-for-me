@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { asset } from '../../app/asset';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
@@ -8,6 +8,9 @@ import { minutesInZone, type DateKey } from '../../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, rankLabel } from '../../domain/config';
 import { sprintCountdown } from '../../domain/plans';
 import { useProgressSummary } from '../../domain/progressSummary';
+import { consistency } from '../../domain/stats';
+import { useActivitySource } from '../../storage/queries';
+import { useProfile } from '../../storage/StorageProvider';
 import { CharacterPortrait } from '../character/CharacterPortrait';
 
 interface Props {
@@ -42,6 +45,10 @@ export function ProfileStrip({ today, collapsed, onToggleCollapsed, timeZone }: 
   const countdown = sprintCountdown(today, sprint.startDate, sprint.endDate);
   const greeting = greetingFor(minutesInZone(clock.now(), timeZone));
   const { global, learning, doing } = progress;
+  const profile = useProfile();
+  const source = useActivitySource();
+  const habit = useMemo(() => (source ? consistency(source, today, profile.weekStart ?? 'monday') : null), [source, today, profile.weekStart]);
+  const streak = habit?.streak.current ?? 0;
 
   return (
     <section className={`strip ${collapsed ? 'strip--collapsed' : ''}`} aria-label="Your progress">
@@ -78,11 +85,20 @@ export function ProfileStrip({ today, collapsed, onToggleCollapsed, timeZone }: 
             </div>
           )}
           <div className="strip__chips">
-            <span className="chip chip--quiet" title="Days in a row with a completed task or documented log">
+            <Link
+              to="/insights"
+              className={`chip ${streak > 0 ? 'chip--streak' : 'chip--quiet'}`}
+              title={`Days in a row with a completed task or documented entry.${habit && streak > 0 && !habit.streak.activeToday ? ' Do one today to keep it going.' : ''}`}
+            >
               <Icon name="flame" size={16} />
-              <span className="tabular">{progress.currentStreak}</span>
+              <span className="tabular">{streak}</span>
               <span>day streak</span>
-            </span>
+              {habit && (
+                <span className="chip__extra tabular" aria-label={`${habit.last7} of the last 7 days active`}>
+                  · {habit.last7}/7
+                </span>
+              )}
+            </Link>
             <Link to="/visions#sprint" className={`chip chip--gold ${countdown.state === 'ended' ? 'chip--quiet' : ''}`}>
               <Icon name="sparkle" size={14} />
               <span>{countdown.label}</span>
