@@ -211,8 +211,12 @@
   transition: background-color var(--dur-select) var(--ease-ui);
 }
 
-.cal__day:hover {
+.cal__cell--lv0 .cal__day:hover {
   background: var(--hover);
+}
+
+.cal__day:hover {
+  filter: brightness(1.15);
 }
 
 .cal__num {
@@ -266,6 +270,149 @@
 .cal-legend__item--journal::before {
   border: 1.5px solid var(--gold);
   background: transparent;
+}
+
+/* ---------- Day intensity: ember, blaze, crystal ---------- */
+
+.cal__day {
+  position: relative;
+  overflow: hidden;
+}
+
+.cal__mark {
+  position: absolute;
+  inset: 34px 0 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.cal__lvl {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.cal__cell--lv1 .cal__day {
+  background: radial-gradient(ellipse 80% 70% at 50% 75%, rgb(255 160 60 / 0.16), transparent 75%);
+}
+
+.cal__cell--lv1 .cal__lvl {
+  color: #ffbf6b;
+}
+
+.cal__cell--lv2 .cal__day {
+  background: radial-gradient(ellipse 90% 80% at 50% 75%, rgb(255 80 40 / 0.3), rgb(255 150 40 / 0.08) 60%, transparent 85%);
+  box-shadow: inset 0 0 0 1px rgb(255 110 60 / 0.35);
+}
+
+.cal__cell--lv2 .cal__lvl {
+  color: #ff8a5c;
+}
+
+.cal__cell--lv3 .cal__day {
+  background:
+    radial-gradient(ellipse 90% 80% at 50% 70%, rgb(111 214 255 / 0.3), rgb(138 107 255 / 0.14) 60%, transparent 90%),
+    linear-gradient(160deg, rgb(230 251 255 / 0.06), transparent 50%);
+  box-shadow: inset 0 0 0 1px rgb(111 214 255 / 0.5), inset 0 0 18px rgb(111 214 255 / 0.18);
+}
+
+.cal__cell--lv3 .cal__lvl {
+  color: #9fe4ff;
+}
+
+.cal__cell--out .cal__mark {
+  opacity: 0.45;
+}
+
+.lvl-mark--1,
+.lvl-mark--2 {
+  filter: drop-shadow(0 0 6px rgb(255 120 40 / 0.6));
+  transform-origin: 50% 90%;
+  animation: lvl-flicker 2.4s ease-in-out infinite;
+}
+
+.lvl-mark--3 {
+  filter: drop-shadow(0 0 8px rgb(111 214 255 / 0.75));
+  animation: lvl-shimmer 3.2s ease-in-out infinite;
+}
+
+@keyframes lvl-flicker {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.05, 0.97) rotate(-1.5deg); }
+  60% { transform: scale(0.97, 1.04) rotate(1.5deg); }
+}
+
+@keyframes lvl-shimmer {
+  0%, 100% { filter: drop-shadow(0 0 6px rgb(111 214 255 / 0.6)); transform: translateY(0); }
+  50% { filter: drop-shadow(0 0 12px rgb(160 140 255 / 0.9)); transform: translateY(-2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lvl-mark--1,
+  .lvl-mark--2,
+  .lvl-mark--3 {
+    animation: none;
+  }
+}
+
+.lvl-legend {
+  margin-top: 16px;
+}
+
+.lvl-legend__how {
+  margin: 0 0 10px;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.lvl-legend__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lvl-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-sm);
+}
+
+.lvl-legend__item > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.lvl-legend__pts {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+@media (max-width: 899px) {
+  .cal__mark {
+    inset: 30px 0 2px;
+  }
+
+  .cal__mark .lvl-mark {
+    width: 20px;
+    height: 20px;
+  }
+
+  .cal__mark .lvl-mark--2 {
+    width: 27px;
+  }
+
+  .cal__lvl {
+    display: none;
+  }
 }
 
 @media (max-width: 899px) {

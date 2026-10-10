@@ -7,13 +7,27 @@ import {
   addDays, addMonths, endOfMonth, formatKey, formatLong, formatMonthYear, parseKey, startOfMonth, startOfWeek,
   type DateKey,
 } from '../../date/localDate';
-import { PROFILE_DEFAULTS } from '../../domain/config';
+import { LEVEL_NAME, type DayActivity, type IntensityLevel } from '../../domain/intensity';
+import { useDayActivity } from '../../storage/queries';
+import { useProfile } from '../../storage/StorageProvider';
+import { LevelMark } from './LevelMark';
 
-/** A real month grid. Task and journal markers fill in once storage exists (stage 2+). */
+function describe(a: DayActivity | undefined): string {
+  if (!a) return 'No activity';
+  const parts = [
+    a.completed && `${a.completed} done`,
+    a.entries && `${a.entries} ${a.entries === 1 ? 'entry' : 'entries'}`,
+    a.goalLogs && `${a.goalLogs} goal ${a.goalLogs === 1 ? 'log' : 'logs'}`,
+  ].filter(Boolean);
+  return `Level ${a.level} ${LEVEL_NAME[a.level]}: ${parts.join(', ')}`;
+}
+
+/** Month grid where each day glows by how much you actually did: ember, blaze, crystal. */
 export function CalendarPage() {
-  const today = useTodayKey(PROFILE_DEFAULTS.timeZone);
+  const profile = useProfile();
+  const today = useTodayKey(profile.timeZone);
   const [cursor, setCursor] = useState<DateKey>(() => startOfMonth(today));
-  const weekStart = PROFILE_DEFAULTS.weekStart;
+  const weekStart = profile.weekStart ?? 'monday';
 
   const weeks = useMemo(() => {
     const first = startOfWeek(startOfMonth(cursor), weekStart);
@@ -31,6 +45,7 @@ export function CalendarPage() {
     return rows;
   }, [cursor, weekStart]);
 
+  const activity = useDayActivity(weeks[0]![0]!, weeks[weeks.length - 1]![6]!);
   const month = parseKey(cursor).month;
   const weekdayNames = weeks[0]!.map((d) => formatKey(d, { weekday: 'short' }));
 
@@ -65,10 +80,23 @@ export function CalendarPage() {
           <div key={row[0]} className="cal__row" role="row">
             {row.map((d) => {
               const inMonth = parseKey(d).month === month;
+              const a = activity?.get(d);
+              const level: IntensityLevel = a?.level ?? 0;
               return (
-                <div key={d} role="gridcell" className={`cal__cell ${inMonth ? '' : 'cal__cell--out'} ${d === today ? 'cal__cell--today' : ''}`}>
-                  <Link to={d === today ? '/' : `/?date=${d}`} className="cal__day" aria-label={`${formatLong(d)}${d === today ? ', today' : ''}. Open this day`}>
+                <div key={d} role="gridcell" className={`cal__cell cal__cell--lv${level} ${inMonth ? '' : 'cal__cell--out'} ${d === today ? 'cal__cell--today' : ''}`}>
+                  <Link
+                    to={d === today ? '/' : `/?date=${d}`}
+                    className="cal__day"
+                    title={describe(a)}
+                    aria-label={`${formatLong(d)}${d === today ? ', today' : ''}. ${describe(a)}. Open this day`}
+                  >
                     <span className="cal__num tabular">{parseKey(d).day}</span>
+                    {level > 0 && (
+                      <span className="cal__mark">
+                        <LevelMark level={level} />
+                        <span className="cal__lvl">Lv {level}</span>
+                      </span>
+                    )}
                   </Link>
                 </div>
               );
@@ -77,13 +105,24 @@ export function CalendarPage() {
         ))}
       </div>
 
-      <div className="cal-legend" aria-hidden="true">
-        <span className="cal-legend__item cal-legend__item--learning">Learning</span>
-        <span className="cal-legend__item cal-legend__item--doing">Doing</span>
-        <span className="cal-legend__item cal-legend__item--journal">Journal entry</span>
+      <div className="lvl-legend">
+        <p className="lvl-legend__how">Each day earns 1 point per finished task or habit, journal entry, and goal log or check-in.</p>
+        <ul className="lvl-legend__list">
+          {([1, 2, 3] as const).map((lv) => (
+            <li key={lv} className={`lvl-legend__item lvl-legend__item--${lv}`}>
+              <LevelMark level={lv} size={22} />
+              <span>
+                <strong>
+                  Level {lv} · {LEVEL_NAME[lv]}
+                </strong>
+                <span className="lvl-legend__pts">{lv === 1 ? '1–2 points' : lv === 2 ? '3–5 points' : '6+ points'}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
 
-      <StageNote stage={4}>Task dots, entry counts, week view and the activity heatmap fill in from your real data in stage 4.</StageNote>
+      <StageNote stage={4}>Task dots, week view and the day panel arrive in stage 4.</StageNote>
     </div>
   );
 }

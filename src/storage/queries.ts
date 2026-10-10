@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { compareKeys, type DateKey } from '../date/localDate';
 import type { Goal, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
+import { dayActivity, type DayActivity } from '../domain/intensity';
 import { isOpen } from '../domain/tasks';
 import { useStorage } from './StorageProvider';
 
@@ -133,4 +134,17 @@ export function useGoalTitles(): Map<ID, string> | undefined {
 export function useDirection(kind: PeriodDirection['kind'], periodKey: string): PeriodDirection | null | undefined {
   const { db } = useStorage();
   return useLiveQuery(async () => (await db.periodDirections.where('[kind+periodKey]').equals([kind, periodKey]).first()) ?? null, [db, kind, periodKey]);
+}
+
+/** Per-day activity (points and level) for an inclusive date range. */
+export function useDayActivity(start: DateKey, end: DateKey): Map<DateKey, DayActivity> | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => {
+    const [tasks, entries, updates] = await Promise.all([
+      db.tasks.where('completionLocalDate').between(start, end, true, true).toArray(),
+      db.entries.where('dateKey').between(start, end, true, true).toArray(),
+      db.goalUpdates.where('dateKey').between(start, end, true, true).toArray(),
+    ]);
+    return dayActivity({ tasks, entries, updates });
+  }, [db, start, end]);
 }
