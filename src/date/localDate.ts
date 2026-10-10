@@ -156,3 +156,34 @@ export const formatWeekday = (key: DateKey) => formatKey(key, { weekday: 'long' 
 export function formatTimeInZone(instant: Date, timeZone: string): string {
   return new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', minute: '2-digit' }).format(instant);
 }
+
+/** Offset of a zone from UTC at an instant, in minutes (e.g. +330 for Asia/Kolkata). */
+export function zoneOffsetMinutes(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(instant);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  return Math.round((asUtc - Math.floor(instant.getTime() / 1000) * 1000) / 60000);
+}
+
+/** The instant when a local wall-clock time occurs on a date in a zone. */
+export function zonedTimeToInstant(key: DateKey, minutesOfDay: number, timeZone: string): Date {
+  const { year, month, day } = parseKey(key);
+  const wall = Date.UTC(year, month - 1, day, 0, minutesOfDay);
+  let guess = wall - zoneOffsetMinutes(new Date(wall), timeZone) * 60000;
+  // A second pass settles times near a DST change.
+  guess = wall - zoneOffsetMinutes(new Date(guess), timeZone) * 60000;
+  return new Date(guess);
+}
+
+export function minutesToHHMM(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}

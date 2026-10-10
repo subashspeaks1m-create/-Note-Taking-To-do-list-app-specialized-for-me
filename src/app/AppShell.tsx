@@ -5,6 +5,9 @@ import { Icon, type IconName } from '../components/Icon';
 import { APP_NAME } from '../domain/config';
 import { useDisplayPrefs } from './displayPrefs';
 
+/** Which build stage this preview shows; the note reappears for each new stage. */
+const PREVIEW_STAGE = 2;
+
 interface Destination {
   to: string;
   label: string;
@@ -44,11 +47,11 @@ export function AppShell() {
       </a>
       <Rail />
       <main id="main" ref={mainRef} tabIndex={-1} className="shell__main">
-        {!prefs.stageBannerDismissed && (
+        {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
-            <span className="stage-banner__tag">Stage 1 preview</span>
-            <span>Layout and visuals only. Tasks and logs start saving in stage 2.</span>
-            <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', true)}>
+            <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
+            <span>Tasks and logs now save on this device. Goals arrive in stage 3; XP and suits in stage 5.</span>
+            <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>
           </div>

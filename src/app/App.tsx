@@ -1,4 +1,5 @@
 import { createBrowserRouter, createMemoryRouter, RouterProvider, type RouteObject } from 'react-router-dom';
+import { ToastProvider } from '../components/Toasts';
 import { ClockProvider } from '../date/clock';
 import { CalendarPage } from '../features/calendar/CalendarPage';
 import { CharacterPage } from '../features/character/CharacterPage';
@@ -7,14 +8,17 @@ import { JournalPage } from '../features/journal/JournalPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { TodayPage } from '../features/today/TodayPage';
 import { VisionsPage } from '../features/visions/VisionsPage';
+import { StorageProvider } from '../storage/StorageProvider';
 import { AppShell } from './AppShell';
 import { DisplayPrefsProvider } from './displayPrefs';
 import { NotFoundPage } from './NotFoundPage';
+import { RouteError } from './RouteError';
 
 const routes: RouteObject[] = [
   {
     path: '/',
     element: <AppShell />,
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <TodayPage /> },
       { path: 'visions', element: <VisionsPage /> },
@@ -38,7 +42,11 @@ export function App() {
   return (
     <ClockProvider>
       <DisplayPrefsProvider>
-        <RouterProvider router={router} />
+        <StorageProvider>
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
+        </StorageProvider>
       </DisplayPrefsProvider>
     </ClockProvider>
   );
