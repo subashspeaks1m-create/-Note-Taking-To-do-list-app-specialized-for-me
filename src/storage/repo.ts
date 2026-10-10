@@ -2,7 +2,7 @@ import type { JSONContent } from '@tiptap/core';
 import { dateKeyInZone, type DateKey } from '../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, RULES_VERSION, type Category, type Effort } from '../domain/config';
 import type {
-  EarningEntry, EntryKind, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
+  EarningEntry, EntryKind, Principle, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
   Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan,
 } from '../domain/models';
 import { wouldCreateCycle } from '../domain/goals';
@@ -75,7 +75,7 @@ export const MAX_REVISIONS_PER_ENTRY = 40;
 /** Autosaves closer together than this update the newest checkpoint instead of adding one. */
 export const CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000;
 
-const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit' } as const;
+const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', principles: 'principles' } as const;
 
 /**
  * Typed storage operations. Components call these instead of touching
@@ -757,6 +757,73 @@ export class Repository {
 
   async renameSeries(id: ID, title: string): Promise<void> {
     await this.db.taskSeries.update(id, { title: normalizeTitle(title), updatedAt: this.iso() });
+  }
+
+  // ---------- Principles ----------
+
+  async listPrinciples(): Promise<Principle[]> {
+    return ((await this.db.kv.get(KV.principles))?.value as Principle[] | undefined) ?? [];
+  }
+
+  /** Runs a change on the ordered list in one transaction, so two tabs can't interleave. */
+  private async changePrinciples(fn: (list: Principle[]) => Principle[]): Promise<Principle[]> {
+    return this.db.transaction('rw', this.db.kv, async () => {
+      const next = fn(await this.listPrinciples());
+      await this.db.kv.put({ key: KV.principles, value: next });
+      return next;
+    });
+  }
+
+  async addPrinciple(input: { text: string; why?: string; top?: boolean }): Promise<Principle> {
+    const text = input.text.trim().replace(/\s+/g, ' ');
+    if (!text) throw new ValidationError('Write the principle first.');
+    if (text.length > 280) throw new ValidationError('Keep a principle under 280 characters.');
+    const at = this.iso();
+    const created: Principle = { id: uuid(), text, why: (input.why ?? '').trim().slice(0, 2000), createdAt: at, updatedAt: at };
+    await this.changePrinciples((list) => (input.top ? [created, ...list] : [...list, created]));
+    return created;
+  }
+
+  async updatePrinciple(id: ID, patch: { text?: string; why?: string }): Promise<void> {
+    const text = patch.text?.trim().replace(/\s+/g, ' ');
+    if (text !== undefined && !text) throw new ValidationError('A principle cannot be empty.');
+    if (text && text.length > 280) throw new ValidationError('Keep a principle under 280 characters.');
+    await this.changePrinciples((list) =>
+      list.map((p) => (p.id === id ? { ...p, ...(text !== undefined ? { text } : {}), ...(patch.why !== undefined ? { why: patch.why.trim().slice(0, 2000) } : {}), updatedAt: this.iso() } : p)),
+    );
+  }
+
+  /** Moves a principle to a position; index 0 makes it the topmost. */
+  async movePrinciple(id: ID, toIndex: number): Promise<void> {
+    await this.changePrinciples((list) => {
+      const from = list.findIndex((p) => p.id === id);
+      if (from < 0) return list;
+      const next = [...list];
+      const [item] = next.splice(from, 1);
+      next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, item!);
+      return next;
+    });
+  }
+
+  /** Removes a principle and returns where it was, so Undo can put it back. */
+  async deletePrinciple(id: ID): Promise<{ principle: Principle; index: number } | null> {
+    let removed: { principle: Principle; index: number } | null = null;
+    await this.changePrinciples((list) => {
+      const index = list.findIndex((p) => p.id === id);
+      if (index < 0) return list;
+      removed = { principle: list[index]!, index };
+      return list.filter((p) => p.id !== id);
+    });
+    return removed;
+  }
+
+  async restorePrinciple(principle: Principle, index: number): Promise<void> {
+    await this.changePrinciples((list) => {
+      if (list.some((p) => p.id === principle.id)) return list;
+      const next = [...list];
+      next.splice(Math.min(index, next.length), 0, principle);
+      return next;
+    });
   }
 
   // ---------- Earnings and outfit ----------

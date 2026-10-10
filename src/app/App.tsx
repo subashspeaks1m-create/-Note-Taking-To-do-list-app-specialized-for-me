@@ -6,6 +6,7 @@ import { CharacterPage } from '../features/character/CharacterPage';
 import { InsightsPage } from '../features/insights/InsightsPage';
 import { JournalEntryPage } from '../features/journal/JournalEntryPage';
 import { JournalPage } from '../features/journal/JournalPage';
+import { PrinciplesPage } from '../features/principles/PrinciplesPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { TodayPage } from '../features/today/TodayPage';
 import { GoalPage } from '../features/visions/GoalPage';
@@ -30,6 +31,7 @@ const routes: RouteObject[] = [
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'journal/:entryId', element: <JournalEntryPage /> },
+      { path: 'principles', element: <PrinciplesPage /> },
       { path: 'character', element: <CharacterPage /> },
       { path: 'insights', element: <InsightsPage /> },
       { path: 'settings', element: <SettingsPage /> },

@@ -1,0 +1,196 @@
+/* Principles page and the #1 principle on Today. */
+
+.principle-hero {
+  position: relative;
+  padding: 28px 30px 30px;
+  border-radius: 22px;
+  border: 1px solid var(--gold-line);
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 0%, rgb(232 196 119 / 0.16), transparent 60%),
+    var(--surface);
+  box-shadow: 0 0 0 1px rgb(232 196 119 / 0.08), 0 18px 60px rgb(232 196 119 / 0.08);
+  overflow: hidden;
+}
+.principle-hero::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 233 176 / 0.9) 50%, transparent 70%) 0 0 / 250% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: principle-sheen 6s linear infinite;
+  pointer-events: none;
+}
+.principle-hero--empty {
+  border-style: dashed;
+}
+.principle-hero--empty::after {
+  display: none;
+}
+.principle-hero__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.principle-hero__head .overline {
+  color: var(--gold);
+}
+.principle-hero__edit {
+  margin-left: auto;
+}
+.principle-hero__text {
+  margin: 18px 0 0;
+  font-family: var(--font-read);
+  font-size: clamp(26px, 4.4vw, 40px);
+  line-height: 1.22;
+  font-weight: 600;
+  color: var(--text);
+  text-wrap: balance;
+}
+.principle-hero__text::before {
+  content: '“';
+  color: var(--gold);
+}
+.principle-hero__text::after {
+  content: '”';
+  color: var(--gold);
+}
+.principle-hero__why {
+  margin-top: 14px;
+  max-width: 65ch;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+.principle-hero__lead {
+  margin: 8px 0 18px;
+  font-family: var(--font-read);
+  font-size: var(--text-xl);
+  color: var(--text);
+}
+
+@keyframes principle-sheen {
+  from { background-position: 100% 0; }
+  to { background-position: -150% 0; }
+}
+
+.principles {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.principle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border-quiet);
+  background: var(--surface);
+}
+.principle--editing {
+  display: block;
+}
+.principle__num {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-weight: 750;
+  color: var(--gold);
+  background: var(--gold-soft);
+  border: 1px solid var(--gold-line);
+}
+.principle__text {
+  font-family: var(--font-read);
+  font-size: var(--text-lg);
+  line-height: 1.35;
+}
+.principle__why {
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+.principle__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.principles__add {
+  margin-top: var(--space-6, 24px);
+}
+.principle-form {
+  display: grid;
+  gap: 12px;
+}
+.principle-form__text {
+  font-family: var(--font-read);
+  font-size: var(--text-lg);
+}
+.principle-form__row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.principle-form__row .check {
+  margin-right: auto;
+}
+
+@media (max-width: 599px) {
+  .principle-hero {
+    padding: 20px;
+  }
+  .principle {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .principle__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+/* Today: the #1 principle above the direction slots. */
+.top-principle {
+  display: grid;
+  gap: 6px;
+  margin-bottom: var(--space-5);
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--gold-line);
+  background: linear-gradient(135deg, rgb(232 196 119 / 0.12), rgb(232 196 119 / 0.03));
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.top-principle:hover {
+  border-color: var(--gold);
+  transform: translateY(-1px);
+}
+.top-principle__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.top-principle__text {
+  font-family: var(--font-read);
+  font-size: var(--text-lg);
+  line-height: 1.3;
+}
+.top-principle__empty {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}

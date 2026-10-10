@@ -252,6 +252,16 @@ export interface PeriodDirection {
 }
 
 /** Small singleton records live in one key-value table. */
+/** A rule Prem lives by. The first in the list is the topmost principle. */
+export interface Principle {
+  id: ID;
+  text: string;
+  /** Optional: why it matters, or the story behind it. */
+  why: string;
+  createdAt: Instant;
+  updatedAt: Instant;
+}
+
 /** Money earned, logged by hand. Lifetime total drives the character's rank form. */
 export interface EarningEntry {
   id: ID;

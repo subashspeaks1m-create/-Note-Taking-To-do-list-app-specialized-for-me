@@ -13,6 +13,7 @@ import './styles/journal.css';
 import './styles/insights.css';
 import './styles/art.css';
 import './styles/character.css';
+import './styles/principles.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -271,3 +271,30 @@ describe('earnings and outfit', () => {
     expect((await db.kv.get('outfit'))?.value).toBe('symbiote');
   });
 });
+
+describe('principles', () => {
+  it('keeps an ordered list where the first is the topmost', async () => {
+    const a = await repo.addPrinciple({ text: '  Never   miss twice ' });
+    const b = await repo.addPrinciple({ text: 'Do the hard thing first', top: true });
+    const c = await repo.addPrinciple({ text: 'Tell the truth' });
+    expect(a.text).toBe('Never miss twice');
+    expect((await repo.listPrinciples()).map((p) => p.id)).toEqual([b.id, a.id, c.id]);
+    await repo.movePrinciple(c.id, 0);
+    expect((await repo.listPrinciples())[0]!.id).toBe(c.id);
+    await expect(repo.addPrinciple({ text: '   ' })).rejects.toThrow();
+  });
+
+  it('edits, deletes and restores a principle in place', async () => {
+    const a = await repo.addPrinciple({ text: 'One' });
+    const b = await repo.addPrinciple({ text: 'Two' });
+    await repo.addPrinciple({ text: 'Three' });
+    await repo.updatePrinciple(b.id, { text: 'Two, edited', why: 'Because' });
+    const removed = await repo.deletePrinciple(b.id);
+    expect(removed?.index).toBe(1);
+    expect((await repo.listPrinciples()).map((p) => p.text)).toEqual(['One', 'Three']);
+    await repo.restorePrinciple(removed!.principle, removed!.index);
+    expect((await repo.listPrinciples()).map((p) => p.text)).toEqual(['One', 'Two, edited', 'Three']);
+    expect((await repo.listPrinciples())[1]!.why).toBe('Because');
+    expect(a.id).toBeTruthy();
+  });
+});

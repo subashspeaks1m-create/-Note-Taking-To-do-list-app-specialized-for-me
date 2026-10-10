@@ -6,7 +6,7 @@ import { useToast } from '../../components/Toasts';
 import { addDays, addMonths, endOfMonth, formatMedium, formatShort, startOfMonth, startOfWeek, type DateKey } from '../../date/localDate';
 import type { PeriodDirection } from '../../domain/models';
 import { sprintCountdown } from '../../domain/plans';
-import { useDirection, usePlans } from '../../storage/queries';
+import { useDirection, usePlans, usePrinciples } from '../../storage/queries';
 import { useProfile, useRepo } from '../../storage/StorageProvider';
 
 interface Props {
@@ -116,6 +116,21 @@ function DirectionSlot({ period }: { period: Period }) {
 }
 
 /** Today's direction plus the long-range plans, each linking to its page. */
+/** The number one principle, kept in sight every day. */
+function TopPrinciple() {
+  const principles = usePrinciples();
+  const top = principles?.[0];
+  if (!principles) return null;
+  return (
+    <Link to="/principles" className="top-principle art-host">
+      <span className="top-principle__label">
+        <Art name="crown" size={18} motion="bounce" /> My #1 principle
+      </span>
+      {top ? <span className="top-principle__text">{top.text}</span> : <span className="top-principle__empty">Write the one rule you follow every single time.</span>}
+    </Link>
+  );
+}
+
 export function DirectionColumn({ selected, today }: Props) {
   const profile = useProfile();
   const plans = usePlans();
@@ -125,6 +140,7 @@ export function DirectionColumn({ selected, today }: Props) {
 
   return (
     <aside className="direction" aria-label="Your direction">
+      <TopPrinciple />
       <p className="overline">The bigger picture</p>
       <h2 className="direction__title panel__title--art art-host">
         <Art name="compass" size={26} motion="spin" />

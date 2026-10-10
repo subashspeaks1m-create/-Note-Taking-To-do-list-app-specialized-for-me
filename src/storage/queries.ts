@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { compareKeys, type DateKey } from '../date/localDate';
-import type { EarningEntry, Goal, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
+import type { EarningEntry, Goal, Principle, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
 import { dayActivity, type DayActivity } from '../domain/intensity';
 import type { ActivitySource } from '../domain/stats';
 import { isOpen } from '../domain/tasks';
@@ -177,4 +177,10 @@ export function useEarnings(): EarningEntry[] | undefined {
 export function useOutfit(): string | null | undefined {
   const { db } = useStorage();
   return useLiveQuery(async () => ((await db.kv.get('outfit'))?.value as string | undefined) ?? null, [db]);
+}
+
+/** Principles in order; the first is the topmost. */
+export function usePrinciples(): Principle[] | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => ((await db.kv.get('principles'))?.value as Principle[] | undefined) ?? [], [db]);
 }
