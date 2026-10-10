@@ -6,7 +6,7 @@ import { addDays, formatShort, isDateKey, type DateKey } from '../../date/localD
 import { TASK_TITLE_MAX, type Category } from '../../domain/config';
 import type { ID, Task } from '../../domain/models';
 import { normalizeTitle, sortTasks, type TaskSort } from '../../domain/tasks';
-import { useCarryOverTasks, useTasksForDate } from '../../storage/queries';
+import { useCarryOverTasks, useGoalTitles, useTasksForDate } from '../../storage/queries';
 import { useRepo } from '../../storage/StorageProvider';
 import { requestPersistenceOnce } from '../../storage/persistence';
 import type { DayRelation } from '../today/useSelectedDate';
@@ -41,6 +41,11 @@ export function TaskPane({ date, today, relation, timeZone, loggedTaskIds, onWri
   const actions = useTaskActions(timeZone);
   const tasks = useTasksForDate(date);
   const carryOver = useCarryOverTasks(today);
+  const goalTitles = useGoalTitles();
+  const goalLabel = (t: Task) => {
+    const titles = t.goalIds.map((id) => goalTitles?.get(id)).filter((x): x is string => !!x);
+    return titles.length ? (titles.length > 1 ? `${titles[0]} +${titles.length - 1}` : titles[0]) : undefined;
+  };
   const [filter, setFilter] = useState<Filter>('all');
   const [sort, setSort] = useState<TaskSort>('manual');
   const [category, setCategory] = useState<Category>('learning');
@@ -380,7 +385,7 @@ export function TaskPane({ date, today, relation, timeZone, loggedTaskIds, onWri
             {carryOpen && (
               <ul className="task-list task-list--carry">
                 {carryOver!.map((t) => (
-                  <TaskRow key={t.id} task={t} showOrigin onToggle={toggle} onOpen={openEditor} onWriteLog={onWriteLog} menuItems={menuItems} hasLog={loggedTaskIds.has(t.id)} />
+                  <TaskRow key={t.id} task={t} showOrigin onToggle={toggle} onOpen={openEditor} onWriteLog={onWriteLog} menuItems={menuItems} hasLog={loggedTaskIds.has(t.id)} goalLabel={goalLabel(t)} />
                 ))}
               </ul>
             )}
@@ -430,6 +435,7 @@ export function TaskPane({ date, today, relation, timeZone, loggedTaskIds, onWri
                 onHandlePointerDown={onHandlePointerDown}
                 onHandleKeyDown={onHandleKeyDown}
                 hasLog={loggedTaskIds.has(t.id)}
+                goalLabel={goalLabel(t)}
               />
             ))}
           </ul>

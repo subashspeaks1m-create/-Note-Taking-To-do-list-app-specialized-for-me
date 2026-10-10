@@ -25,6 +25,8 @@ interface Props extends TaskRowHandlers {
   onHandlePointerDown?: (e: PointerEvent<HTMLButtonElement>, task: Task) => void;
   onHandleKeyDown?: (e: KeyboardEvent<HTMLButtonElement>, task: Task) => void;
   hasLog?: boolean;
+  /** Title of the goal this task moves, when linked. */
+  goalLabel?: string;
 }
 
 function formatTime(t: string): string {
@@ -35,7 +37,7 @@ function formatTime(t: string): string {
 
 export const TaskRow = memo(function TaskRow({
   task, showOrigin, selectable, selected, onSelect, reorderable, dragging, dragOffset = 0, onToggle, onOpen, onWriteLog,
-  menuItems, onHandlePointerDown, onHandleKeyDown, hasLog,
+  menuItems, onHandlePointerDown, onHandleKeyDown, hasLog, goalLabel,
 }: Props) {
   const done = task.status === 'completed';
   const canceled = task.status === 'canceled';
@@ -97,7 +99,12 @@ export const TaskRow = memo(function TaskRow({
           {task.estimatedMinutes && <span className="task__chip">{task.estimatedMinutes} min</span>}
           {task.seriesId && (
             <span className="task__chip" title="Repeating task">
-              ↻ Repeats
+              ↻ {goalLabel ? 'Habit' : 'Repeats'}
+            </span>
+          )}
+          {goalLabel && (
+            <span className="task__chip task__chip--goal" title={`Moves: ${goalLabel}`}>
+              ◎ {goalLabel}
             </span>
           )}
           {showOrigin && <span className="task__chip task__chip--origin">{task.scheduledDate ? `From ${formatShort(task.scheduledDate)}` : 'Unscheduled'}</span>}

@@ -1,10 +1,10 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type {
-  AchievementUnlock, CosmeticUnlock, EntryRevision, Goal, JournalEntry, KeyValue, Milestone, PeriodDirection,
+  AchievementUnlock, CosmeticUnlock, EntryRevision, Goal, GoalUpdate, JournalEntry, KeyValue, Milestone, PeriodDirection,
   Task, TaskMove, TaskSeries, VisionPlan, XPEvent,
 } from '../domain/models';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 /**
  * IndexedDB schema. Every table the product needs is declared from version 1
@@ -16,6 +16,7 @@ export class AppDatabase extends Dexie {
   plans!: EntityTable<VisionPlan, 'id'>;
   goals!: EntityTable<Goal, 'id'>;
   milestones!: EntityTable<Milestone, 'id'>;
+  goalUpdates!: EntityTable<GoalUpdate, 'id'>;
   periodDirections!: EntityTable<PeriodDirection, 'id'>;
   taskSeries!: EntityTable<TaskSeries, 'id'>;
   tasks!: EntityTable<Task, 'id'>;
@@ -28,7 +29,7 @@ export class AppDatabase extends Dexie {
 
   constructor(name: string) {
     super(name);
-    this.version(SCHEMA_VERSION).stores({
+    this.version(1).stores({
       kv: 'key',
       plans: 'id, kind',
       goals: 'id, planId, parentId, periodDirectionId',
@@ -43,6 +44,17 @@ export class AppDatabase extends Dexie {
       xpEvents: 'id, &eventKey, sourceId, earnedDate',
       achievements: 'id, &achievementId',
       cosmetics: 'id, &cosmeticId',
+    });
+    // Stage 3: goal progress history, and goal links indexed on tasks and series.
+    this.version(2).stores({
+      goalUpdates: 'id, goalId, dateKey',
+      tasks: 'id, scheduledDate, status, seriesId, &[seriesId+occurrenceDate], completionLocalDate, *goalIds',
+      taskSeries: 'id, *goalIds',
+    }).upgrade(async (tx) => {
+      await tx.table('plans').toCollection().modify((p: Partial<VisionPlan>) => {
+        p.statement ??= '';
+        p.review ??= '';
+      });
     });
   }
 }

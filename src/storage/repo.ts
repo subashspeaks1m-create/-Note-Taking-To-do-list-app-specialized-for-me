@@ -2,9 +2,10 @@ import type { JSONContent } from '@tiptap/core';
 import { dateKeyInZone, type DateKey } from '../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, RULES_VERSION, type Category, type Effort } from '../domain/config';
 import type {
-  EntryKind, EntryRevision, ID, JournalEntry, Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries,
-  TaskStatus, VisionPlan,
+  EntryKind, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
+  Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan,
 } from '../domain/models';
+import { wouldCreateCycle } from '../domain/goals';
 import { RECURRENCE_HORIZON_DAYS, seriesOccursOn } from '../domain/recurrence';
 import { normalizeTitle, rankBetween, ValidationError, withStatus } from '../domain/tasks';
 import { addDays, compareKeys } from '../date/localDate';
@@ -36,6 +37,28 @@ export interface NewTaskInput {
 export type TaskPatch = Partial<
   Pick<Task, 'title' | 'details' | 'category' | 'priority' | 'effort' | 'dueTime' | 'estimatedMinutes' | 'tags' | 'goalIds'>
 >;
+
+export interface GoalInput {
+  title: string;
+  planId: ID | null;
+  parentId?: ID | null;
+  why?: string;
+  category?: Goal['category'];
+  domain?: string;
+  measurementMode: MeasurementMode;
+  target?: number | null;
+  current?: number | null;
+  unit?: string;
+  reviewDate?: DateKey | null;
+  notes?: string;
+  sealedReward?: string;
+}
+
+export type PlanPatch = Partial<Pick<VisionPlan, 'title' | 'startDate' | 'endDate' | 'statement' | 'notes' | 'successCriteria' | 'review'>>;
+
+/** Earlier direction wordings kept per period. */
+export const MAX_DIRECTION_HISTORY = 20;
+const TITLE_MAX_GOAL = 160;
 
 export interface EntryContent {
   title: string;
@@ -92,8 +115,10 @@ export class Repository {
         title: p.title,
         startDate: p.startDate,
         endDate: p.endDate,
+        statement: '',
         notes: '',
         successCriteria: '',
+        review: '',
         archivedAt: null,
         createdAt: at,
         updatedAt: at,
@@ -540,6 +565,233 @@ export class Repository {
         revision: current.revision + 1,
       };
       await this.db.entries.put(next);
+      return next;
+    });
+  }
+
+  // ---------- Plans ----------
+
+  async updatePlan(id: ID, patch: PlanPatch): Promise<VisionPlan> {
+    return this.db.transaction('rw', this.db.plans, async () => {
+      const plan = await this.db.plans.get(id);
+      if (!plan) throw new ValidationError('That plan no longer exists.');
+      const next: VisionPlan = { ...plan, ...patch, updatedAt: this.iso() };
+      if (patch.title !== undefined && !next.title.trim()) throw new ValidationError('Give the plan a name.');
+      if (compareKeys(next.startDate, next.endDate) >= 0) throw new ValidationError('The end date must be after the start date.');
+      await this.db.plans.put({ ...next, title: next.title.trim() });
+      return next;
+    });
+  }
+
+  async createPlan(input: { kind: VisionPlan['kind']; title: string; startDate: DateKey; endDate: DateKey }): Promise<VisionPlan> {
+    if (!input.title.trim()) throw new ValidationError('Give the plan a name.');
+    if (compareKeys(input.startDate, input.endDate) >= 0) throw new ValidationError('The end date must be after the start date.');
+    const at = this.iso();
+    const plan: VisionPlan = {
+      id: uuid(),
+      kind: input.kind,
+      title: input.title.trim(),
+      startDate: input.startDate,
+      endDate: input.endDate,
+      statement: '',
+      notes: '',
+      successCriteria: '',
+      review: '',
+      archivedAt: null,
+      createdAt: at,
+      updatedAt: at,
+    };
+    await this.db.plans.add(plan);
+    return plan;
+  }
+
+  async setPlanArchived(id: ID, archived: boolean): Promise<void> {
+    const at = this.iso();
+    await this.db.plans.update(id, { archivedAt: archived ? at : null, updatedAt: at });
+  }
+
+  // ---------- Goals ----------
+
+  private validateGoal(g: Goal, all: Goal[]): void {
+    if (!g.title.trim()) throw new ValidationError('Give the goal a name.');
+    if (g.title.length > TITLE_MAX_GOAL) throw new ValidationError(`Keep the goal name under ${TITLE_MAX_GOAL} characters.`);
+    if (g.measurementMode === 'numeric' && !(typeof g.target === 'number' && g.target > 0)) throw new ValidationError('A number goal needs a target above zero.');
+    if (g.measurementMode === 'manual' && g.current !== null && (g.current < 0 || g.current > 100)) throw new ValidationError('Percent must be between 0 and 100.');
+    if (wouldCreateCycle(all, g.id, g.parentId)) throw new ValidationError('A goal cannot sit under one of its own sub-goals.');
+  }
+
+  async createGoal(input: GoalInput, dateKey: DateKey): Promise<Goal> {
+    return this.db.transaction('rw', this.db.goals, this.db.goalUpdates, async () => {
+      const all = await this.db.goals.toArray();
+      const at = this.iso();
+      const siblings = all.filter((g) => g.planId === input.planId && (g.parentId ?? null) === (input.parentId ?? null));
+      const goal: Goal = {
+        id: uuid(),
+        planId: input.planId,
+        periodDirectionId: null,
+        parentId: input.parentId ?? null,
+        title: input.title.trim(),
+        why: input.why?.trim() ?? '',
+        category: input.category ?? 'both',
+        domain: input.domain?.trim() ?? '',
+        measurementMode: input.measurementMode,
+        target: input.measurementMode === 'numeric' ? (input.target ?? null) : null,
+        current: input.measurementMode === 'numeric' ? (input.current ?? 0) : input.measurementMode === 'manual' ? (input.current ?? null) : null,
+        unit: input.measurementMode === 'numeric' ? (input.unit?.trim() ?? '') : '',
+        status: 'active',
+        reviewDate: input.reviewDate ?? null,
+        notes: input.notes ?? '',
+        sealedReward: input.sealedReward?.trim() ?? '',
+        achievedAt: null,
+        rank: siblings.reduce((m, g) => Math.max(m, g.rank), 0) + 1,
+        createdAt: at,
+        updatedAt: at,
+      };
+      this.validateGoal(goal, all);
+      await this.db.goals.add(goal);
+      if (goal.current !== null && goal.current !== 0) {
+        await this.db.goalUpdates.add({ id: uuid(), goalId: goal.id, dateKey, at, kind: 'value', value: goal.current, previous: null, note: 'Starting point' });
+      }
+      return goal;
+    });
+  }
+
+  async updateGoal(id: ID, patch: Partial<GoalInput>): Promise<Goal> {
+    return this.db.transaction('rw', this.db.goals, async () => {
+      const all = await this.db.goals.toArray();
+      const goal = all.find((g) => g.id === id);
+      if (!goal) throw new ValidationError('That goal no longer exists.');
+      const mode = patch.measurementMode ?? goal.measurementMode;
+      const next: Goal = {
+        ...goal,
+        ...Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)),
+        title: (patch.title ?? goal.title).trim(),
+        measurementMode: mode,
+        updatedAt: this.iso(),
+      };
+      if (mode !== goal.measurementMode) {
+        // Switching measure keeps history; the new mode starts from its own evidence.
+        next.current = mode === 'numeric' ? (patch.current ?? 0) : mode === 'manual' ? (patch.current ?? null) : null;
+        if (mode !== 'numeric') {
+          next.target = null;
+          next.unit = '';
+        }
+      }
+      this.validateGoal(next, all);
+      await this.db.goals.put(next);
+      return next;
+    });
+  }
+
+  /** Logs a new value (numeric total or manual percent) as an append-only update. */
+  async logGoalValue(id: ID, value: number, note: string, dateKey: DateKey): Promise<Goal> {
+    return this.db.transaction('rw', this.db.goals, this.db.goalUpdates, async () => {
+      const goal = await this.db.goals.get(id);
+      if (!goal) throw new ValidationError('That goal no longer exists.');
+      if (goal.measurementMode !== 'numeric' && goal.measurementMode !== 'manual') throw new ValidationError('This goal is measured another way.');
+      if (!Number.isFinite(value)) throw new ValidationError('Enter a number.');
+      if (goal.measurementMode === 'manual' && (value < 0 || value > 100)) throw new ValidationError('Percent must be between 0 and 100.');
+      const at = this.iso();
+      await this.db.goalUpdates.add({ id: uuid(), goalId: id, dateKey, at, kind: 'value', value, previous: goal.current, note: note.trim() });
+      const next = { ...goal, current: value, updatedAt: at };
+      await this.db.goals.put(next);
+      return next;
+    });
+  }
+
+  /** A written check-in with no number: still counts for the goal's streak. */
+  async logGoalNote(id: ID, note: string, dateKey: DateKey): Promise<void> {
+    if (!note.trim()) throw new ValidationError('Write something first.');
+    await this.db.goalUpdates.add({ id: uuid(), goalId: id, dateKey, at: this.iso(), kind: 'note', value: null, previous: null, note: note.trim() });
+  }
+
+  async setGoalStatus(id: ID, status: GoalStatus, dateKey: DateKey): Promise<Goal> {
+    return this.db.transaction('rw', this.db.goals, this.db.goalUpdates, async () => {
+      const goal = await this.db.goals.get(id);
+      if (!goal) throw new ValidationError('That goal no longer exists.');
+      const at = this.iso();
+      const next: Goal = { ...goal, status, achievedAt: status === 'achieved' ? (goal.achievedAt ?? at) : status === 'active' ? null : goal.achievedAt, updatedAt: at };
+      await this.db.goals.put(next);
+      await this.db.goalUpdates.add({ id: uuid(), goalId: id, dateKey, at, kind: 'status', value: null, previous: null, note: status });
+      return next;
+    });
+  }
+
+  async addMilestone(goalId: ID, title: string, weight = 1): Promise<Milestone> {
+    if (!title.trim()) throw new ValidationError('Give the milestone a name.');
+    if (!(weight > 0)) throw new ValidationError('Weight must be above zero.');
+    const existing = await this.db.milestones.where('goalId').equals(goalId).toArray();
+    const m: Milestone = { id: uuid(), goalId, title: title.trim(), weight, achievedAt: null, archivedAt: null, rank: existing.reduce((x, e) => Math.max(x, e.rank), 0) + 1 };
+    await this.db.milestones.add(m);
+    return m;
+  }
+
+  async setMilestoneAchieved(id: ID, achieved: boolean, dateKey: DateKey): Promise<void> {
+    await this.db.transaction('rw', this.db.milestones, this.db.goalUpdates, async () => {
+      const m = await this.db.milestones.get(id);
+      if (!m) return;
+      const at = this.iso();
+      await this.db.milestones.update(id, { achievedAt: achieved ? at : null });
+      if (achieved) await this.db.goalUpdates.add({ id: uuid(), goalId: m.goalId, dateKey, at, kind: 'milestone', value: null, previous: null, note: m.title });
+    });
+  }
+
+  async archiveMilestone(id: ID, archived: boolean): Promise<void> {
+    await this.db.milestones.update(id, { archivedAt: archived ? this.iso() : null });
+  }
+
+  async setTaskGoals(taskId: ID, goalIds: ID[]): Promise<Task> {
+    return this.updateTask(taskId, { goalIds: [...new Set(goalIds)] });
+  }
+
+  // ---------- Habits (repeating tasks tied to a goal) ----------
+
+  async addHabit(input: { goalId: ID; title: string; category: Category; rule: RecurrenceRule; startDate: DateKey; effort?: Effort }): Promise<TaskSeries> {
+    return this.createSeries({ title: input.title, category: input.category, effort: input.effort, scheduledDate: input.startDate, rule: input.rule, goalIds: [input.goalId] });
+  }
+
+  async resumeSeries(id: ID, fromDate: DateKey): Promise<void> {
+    await this.db.taskSeries.update(id, { stoppedAt: null, updatedAt: this.iso() });
+    await this.ensureOccurrences(fromDate, fromDate);
+  }
+
+  async renameSeries(id: ID, title: string): Promise<void> {
+    await this.db.taskSeries.update(id, { title: normalizeTitle(title), updatedAt: this.iso() });
+  }
+
+  // ---------- Period direction (today, this week, this month) ----------
+
+  async saveDirection(input: { kind: PeriodDirection['kind']; periodKey: string; startDate: DateKey; endDate: DateKey; intention: string; desiredOutcome?: string; review?: string }): Promise<PeriodDirection> {
+    return this.db.transaction('rw', this.db.periodDirections, async () => {
+      const existing = await this.db.periodDirections.where('[kind+periodKey]').equals([input.kind, input.periodKey]).first();
+      const at = this.iso();
+      if (!existing) {
+        const created: PeriodDirection = {
+          id: uuid(),
+          kind: input.kind,
+          periodKey: input.periodKey,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          intention: input.intention.trim(),
+          desiredOutcome: input.desiredOutcome?.trim() ?? '',
+          review: input.review?.trim() ?? '',
+          updatedAt: at,
+          version: 1,
+          history: [],
+        };
+        await this.db.periodDirections.add(created);
+        return created;
+      }
+      const next: PeriodDirection = {
+        ...existing,
+        intention: input.intention.trim(),
+        desiredOutcome: input.desiredOutcome?.trim() ?? existing.desiredOutcome,
+        review: input.review?.trim() ?? existing.review,
+        updatedAt: at,
+        version: existing.version + 1,
+        history: [...(existing.history ?? []), { at: existing.updatedAt, intention: existing.intention, desiredOutcome: existing.desiredOutcome, review: existing.review }].slice(-MAX_DIRECTION_HISTORY),
+      };
+      await this.db.periodDirections.put(next);
       return next;
     });
   }
