@@ -117,6 +117,8 @@
 .live-icon {
   display: block;
   flex: none;
+  /* The svg remounts on hover/focus; clicks must land on the link, not on a node that disappears mid-click. */
+  pointer-events: none;
   transition: transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 .rail__link:hover .live-icon,
