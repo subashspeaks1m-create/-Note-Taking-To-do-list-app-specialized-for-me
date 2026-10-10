@@ -88,67 +88,6 @@ export function rankLabel(level: number): string {
   return 'Initiate';
 }
 
-export type SuitId = 'base' | 'scholar' | 'builder' | 'ascendant';
-
-export interface SuitDefinition {
-  id: SuitId;
-  name: string;
-  description: string;
-  requirement: string;
-  minLearningXp: number;
-  minDoingXp: number;
-  minGlobalXp: number;
-  accent: 'neutral' | 'learning' | 'doing' | 'gold';
-  /** Static portrait with real alpha. The base suit uses the source video instead. */
-  image?: string;
-}
-
-export const SUITS: readonly SuitDefinition[] = [
-  {
-    id: 'base',
-    name: 'Initiate',
-    description: 'Your original hoodie portrait.',
-    requirement: 'Available from the start',
-    minLearningXp: 0,
-    minDoingXp: 0,
-    minGlobalXp: 0,
-    accent: 'neutral',
-  },
-  {
-    id: 'scholar',
-    name: 'Scholar',
-    description: 'Graphite technical suit with cyan seams.',
-    requirement: 'Reach 300 Learning XP',
-    minLearningXp: 300,
-    minDoingXp: 0,
-    minGlobalXp: 0,
-    accent: 'learning',
-    image: asset('/assets/character/scholar.webp'),
-  },
-  {
-    id: 'builder',
-    name: 'Builder',
-    description: 'Modular work suit with coral and copper seams.',
-    requirement: 'Reach 300 Doing XP',
-    minLearningXp: 0,
-    minDoingXp: 300,
-    minGlobalXp: 0,
-    accent: 'doing',
-    image: asset('/assets/character/builder.webp'),
-  },
-  {
-    id: 'ascendant',
-    name: 'Ascendant',
-    description: 'Graphite and gold armored suit.',
-    requirement: '1,500 total XP with at least 300 in each track',
-    minLearningXp: 300,
-    minDoingXp: 300,
-    minGlobalXp: 1500,
-    accent: 'gold',
-    image: asset('/assets/character/ascendant.webp'),
-  },
-];
-
 export const CHARACTER_MEDIA = {
   video: asset('/assets/character/figure-center-loop.mp4'),
   poster: asset('/assets/character/base-poster.webp'),

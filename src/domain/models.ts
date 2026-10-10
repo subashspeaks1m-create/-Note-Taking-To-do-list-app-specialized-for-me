@@ -252,6 +252,19 @@ export interface PeriodDirection {
 }
 
 /** Small singleton records live in one key-value table. */
+/** Money earned, logged by hand. Lifetime total drives the character's rank form. */
+export interface EarningEntry {
+  id: ID;
+  /** Local day the money came in. */
+  dateKey: DateKey;
+  /** Whole US dollars. */
+  amount: number;
+  note: string;
+  createdAt: Instant;
+  updatedAt: Instant;
+  deletedAt: Instant | null;
+}
+
 export interface KeyValue {
   key: string;
   value: unknown;

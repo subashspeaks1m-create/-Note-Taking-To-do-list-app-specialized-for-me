@@ -13,7 +13,7 @@ import { useProfile } from '../storage/StorageProvider';
 import { useDisplayPrefs } from './displayPrefs';
 
 /** Which build stage this preview shows; the note reappears for each new stage. */
-const PREVIEW_STAGE = 4;
+const PREVIEW_STAGE = 5;
 
 interface Destination {
   to: string;
@@ -58,7 +58,7 @@ export function AppShell() {
         {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
             <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
-            <span>Calendar, journal search, streaks, "you vs past you" and weekly/monthly reports are live. XP, suits and transformations come in stage 5.</span>
+            <span>Step 1 of stage 5: the Character page has a spinning platform, an earnings log, money-based rank forms and 10 hero suits to try on. 360° clips, XP and transformations come next.</span>
             <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>

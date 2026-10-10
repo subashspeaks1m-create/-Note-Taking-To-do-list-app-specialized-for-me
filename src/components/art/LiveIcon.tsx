@@ -1,30 +1,7 @@
-import { useId, useMemo, useSyncExternalStore } from 'react';
+import { useId, useMemo } from 'react';
+import { useReducedMotion } from '../../app/displayPrefs';
 import { Icon } from '../Icon';
 import { LIVE_ICONS, type LiveIconName } from './liveIcons';
-
-const QUERY = '(prefers-reduced-motion: reduce)';
-
-function subscribe(onChange: () => void) {
-  const mq = window.matchMedia(QUERY);
-  mq.addEventListener('change', onChange);
-  const obs = new MutationObserver(onChange);
-  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
-  return () => {
-    mq.removeEventListener('change', onChange);
-    obs.disconnect();
-  };
-}
-
-function reducedMotion(): boolean {
-  const pref = document.documentElement.dataset.motion;
-  if (pref === 'reduced') return true;
-  if (pref === 'full') return false;
-  return window.matchMedia(QUERY).matches;
-}
-
-export function useReducedMotion(): boolean {
-  return useSyncExternalStore(subscribe, reducedMotion, () => false);
-}
 
 /**
  * An icon that draws itself (line-md, MIT). Change `play` to replay the

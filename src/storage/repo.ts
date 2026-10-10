@@ -2,7 +2,7 @@ import type { JSONContent } from '@tiptap/core';
 import { dateKeyInZone, type DateKey } from '../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, RULES_VERSION, type Category, type Effort } from '../domain/config';
 import type {
-  EntryKind, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
+  EarningEntry, EntryKind, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
   Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan,
 } from '../domain/models';
 import { wouldCreateCycle } from '../domain/goals';
@@ -75,7 +75,7 @@ export const MAX_REVISIONS_PER_ENTRY = 40;
 /** Autosaves closer together than this update the newest checkpoint instead of adding one. */
 export const CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000;
 
-const KV = { profile: 'profile', meta: 'meta' } as const;
+const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit' } as const;
 
 /**
  * Typed storage operations. Components call these instead of touching
@@ -757,6 +757,32 @@ export class Repository {
 
   async renameSeries(id: ID, title: string): Promise<void> {
     await this.db.taskSeries.update(id, { title: normalizeTitle(title), updatedAt: this.iso() });
+  }
+
+  // ---------- Earnings and outfit ----------
+
+  async addEarning(input: { dateKey: DateKey; amount: number; note?: string }): Promise<EarningEntry> {
+    const amount = Math.round(input.amount);
+    if (!Number.isFinite(amount) || amount <= 0) throw new ValidationError('Enter an amount above zero.');
+    if (amount > 1e13) throw new ValidationError('That amount is too large.');
+    const at = this.iso();
+    const entry: EarningEntry = { id: uuid(), dateKey: input.dateKey, amount, note: (input.note ?? '').trim().slice(0, 200), createdAt: at, updatedAt: at, deletedAt: null };
+    await this.db.earnings.add(entry);
+    return entry;
+  }
+
+  async deleteEarning(id: ID): Promise<void> {
+    const at = this.iso();
+    await this.db.earnings.update(id, { deletedAt: at, updatedAt: at });
+  }
+
+  async restoreEarning(id: ID): Promise<void> {
+    await this.db.earnings.update(id, { deletedAt: null, updatedAt: this.iso() });
+  }
+
+  /** The look shown on the platform: a rank form or an unlocked suit. */
+  async setOutfit(outfitId: string): Promise<void> {
+    await this.db.kv.put({ key: KV.outfit, value: outfitId });
   }
 
   // ---------- Period direction (today, this week, this month) ----------

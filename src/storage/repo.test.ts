@@ -253,3 +253,21 @@ describe('plans and goals', () => {
     expect(again.history.at(-1)?.blockers).toBe('Too many meetings');
   });
 });
+
+describe('earnings and outfit', () => {
+  it('logs whole-dollar earnings, rejects bad amounts and soft-deletes', async () => {
+    const e = await repo.addEarning({ dateKey: '2026-10-10', amount: 2500.4, note: '  First client  ' });
+    expect(e).toMatchObject({ amount: 2500, note: 'First client', deletedAt: null });
+    await expect(repo.addEarning({ dateKey: '2026-10-10', amount: 0 })).rejects.toThrow();
+    await expect(repo.addEarning({ dateKey: '2026-10-10', amount: Number.NaN })).rejects.toThrow();
+    await repo.deleteEarning(e.id);
+    expect((await db.earnings.get(e.id))?.deletedAt).toBeTruthy();
+    await repo.restoreEarning(e.id);
+    expect((await db.earnings.get(e.id))?.deletedAt).toBeNull();
+  });
+
+  it('remembers the equipped look', async () => {
+    await repo.setOutfit('symbiote');
+    expect((await db.kv.get('outfit'))?.value).toBe('symbiote');
+  });
+});

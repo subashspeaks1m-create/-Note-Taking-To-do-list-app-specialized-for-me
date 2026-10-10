@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { compareKeys, type DateKey } from '../date/localDate';
-import type { Goal, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
+import type { EarningEntry, Goal, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
 import { dayActivity, type DayActivity } from '../domain/intensity';
 import type { ActivitySource } from '../domain/stats';
 import { isOpen } from '../domain/tasks';
@@ -162,4 +162,19 @@ export function useActivitySource(): ActivitySource | undefined {
     ]);
     return { tasks, entries, updates, moves };
   }, [db]);
+}
+
+/** Logged earnings, newest first. */
+export function useEarnings(): EarningEntry[] | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(
+    async () => (await db.earnings.filter((e) => !e.deletedAt).toArray()).sort((a, b) => b.dateKey.localeCompare(a.dateKey) || b.createdAt.localeCompare(a.createdAt)),
+    [db],
+  );
+}
+
+/** The look chosen on the Character page, or null when none was picked. */
+export function useOutfit(): string | null | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => ((await db.kv.get('outfit'))?.value as string | undefined) ?? null, [db]);
 }
