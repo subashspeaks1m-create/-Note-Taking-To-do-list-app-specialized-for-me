@@ -14,7 +14,8 @@ export interface DisplayPrefs {
   motion: 'system' | 'full' | 'reduced';
   lowGraphics: boolean;
   avatarPlayback: 'auto' | 'still';
-  stageBannerDismissed: boolean;
+  /** The build stage whose preview note was dismissed (0 = none). */
+  stageBannerDismissed: number;
 }
 
 const DEFAULTS: DisplayPrefs = {
@@ -25,7 +26,7 @@ const DEFAULTS: DisplayPrefs = {
   motion: 'system',
   lowGraphics: false,
   avatarPlayback: 'auto',
-  stageBannerDismissed: false,
+  stageBannerDismissed: 0,
 };
 
 const KEY = 'pog.display.v1';

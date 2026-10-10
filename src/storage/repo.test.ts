@@ -1,0 +1,190 @@
+import 'fake-indexeddb/auto';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { AppDatabase } from './db';
+import { ConflictError, Repository, type EntryContent } from './repo';
+
+const TZ = 'Asia/Kolkata';
+let db: AppDatabase;
+let repo: Repository;
+let clock = new Date('2026-10-10T04:30:00Z'); // 10:00 IST
+
+beforeEach(async () => {
+  db = new AppDatabase(`test-${crypto.randomUUID()}`);
+  clock = new Date('2026-10-10T04:30:00Z');
+  repo = new Repository(db, () => clock);
+  await repo.ensureInitialized();
+});
+
+afterEach(async () => {
+  db.close();
+  await db.delete();
+});
+
+function content(text: string, extra: Partial<EntryContent> = {}): EntryContent {
+  return {
+    title: '',
+    kind: 'learning',
+    doc: { type: 'doc', content: text.split('\n\n').map((p) => ({ type: 'paragraph', content: [{ type: 'text', text: p }] })) },
+    plainText: text,
+    happenedAt: clock.toISOString(),
+    taskIds: [],
+    tags: [],
+    ...extra,
+  };
+}
+
+describe('setup', () => {
+  it('creates profile and the three original plans exactly once', async () => {
+    await repo.ensureInitialized();
+    await repo.ensureInitialized();
+    const plans = await db.plans.toArray();
+    expect(plans).toHaveLength(3);
+    expect(plans.map((p) => [p.kind, p.startDate, p.endDate]).sort()).toEqual([
+      ['decade', '2026-10-10', '2036-10-10'],
+      ['sprint', '2026-10-10', '2026-12-31'],
+      ['year', '2026-10-10', '2027-10-10'],
+    ]);
+    expect((await repo.getProfile()).timeZone).toBe('Asia/Kolkata');
+  });
+});
+
+describe('tasks', () => {
+  it('adds tasks in order with their category and no reward', async () => {
+    await repo.addTask({ title: 'Read one chapter', category: 'learning', scheduledDate: '2026-10-10' });
+    await repo.addTask({ title: 'Ship the settings screen', category: 'doing', scheduledDate: '2026-10-10' });
+    const tasks = await db.tasks.where('scheduledDate').equals('2026-10-10').sortBy('rank');
+    expect(tasks.map((t) => [t.title, t.category])).toEqual([
+      ['Read one chapter', 'learning'],
+      ['Ship the settings screen', 'doing'],
+    ]);
+    expect(tasks.every((t) => t.award === null)).toBe(true);
+    expect(await db.xpEvents.count()).toBe(0);
+  });
+
+  it('rejects an empty title without writing anything', async () => {
+    await expect(repo.addTask({ title: '   ', category: 'doing', scheduledDate: '2026-10-10' })).rejects.toThrow(/needs a title/);
+    expect(await db.tasks.count()).toBe(0);
+  });
+
+  it('bulk add creates exactly one task per title', async () => {
+    const tasks = await repo.addTasks(['A', 'B', 'C'], 'doing', '2026-10-10');
+    expect(tasks).toHaveLength(3);
+    expect(await db.tasks.count()).toBe(3);
+  });
+
+  it('moving keeps identity, original date and history', async () => {
+    const t = await repo.addTask({ title: 'Move me', category: 'doing', scheduledDate: '2026-10-10' });
+    await repo.moveTasks([t.id], '2026-10-11', 'reschedule');
+    const moved = await db.tasks.get(t.id);
+    expect(moved!.scheduledDate).toBe('2026-10-11');
+    expect(moved!.originalScheduledDate).toBe('2026-10-10');
+    expect(await db.tasks.count()).toBe(1);
+    const moves = await repo.taskMoves(t.id);
+    expect(moves.map((m) => [m.fromDate, m.toDate])).toEqual([['2026-10-10', '2026-10-11']]);
+  });
+
+  it('delete and undo restore the task with its completion snapshot', async () => {
+    const t = await repo.addTask({ title: 'Done then deleted', category: 'learning', scheduledDate: '2026-10-10' });
+    const { after } = await repo.setTaskStatus(t.id, 'completed', TZ);
+    await repo.deleteTasks([t.id]);
+    expect((await db.tasks.get(t.id))!.deletedAt).not.toBeNull();
+    await repo.restoreTasks([t.id]);
+    const restored = await db.tasks.get(t.id);
+    expect(restored!.deletedAt).toBeNull();
+    expect(restored!.status).toBe('completed');
+    expect(restored!.award).toEqual(after.award);
+  });
+
+  it('duplicate is a fresh task with no history', async () => {
+    const t = await repo.addTask({ title: 'Repeat', category: 'learning', scheduledDate: '2026-10-10', effort: 'deep' });
+    await repo.setTaskStatus(t.id, 'completed', TZ);
+    const copy = await repo.duplicateTask(t.id);
+    expect(copy.id).not.toBe(t.id);
+    expect(copy.status).toBe('todo');
+    expect(copy.award).toBeNull();
+    expect(copy.effort).toBe('deep');
+  });
+
+  it('recurrence regeneration never duplicates an occurrence', async () => {
+    await repo.createSeries({ title: 'Practice', category: 'learning', scheduledDate: '2026-10-10', rule: { freq: 'daily', interval: 1 } });
+    for (let i = 0; i < 3; i++) {
+      await repo.ensureOccurrences('2026-10-10', '2026-10-10');
+      await repo.ensureOccurrences('2026-10-11', '2026-10-10');
+    }
+    const all = await db.tasks.toArray();
+    expect(all.map((t) => t.occurrenceDate).sort()).toEqual(['2026-10-10', '2026-10-11']);
+  });
+
+  it('editing one occurrence leaves other occurrences alone', async () => {
+    await repo.createSeries({ title: 'Practice', category: 'learning', scheduledDate: '2026-10-10', rule: { freq: 'daily', interval: 1 } });
+    await repo.ensureOccurrences('2026-10-11', '2026-10-10');
+    const [first, second] = await db.tasks.orderBy('scheduledDate').toArray();
+    await repo.setTaskStatus(first!.id, 'completed', TZ);
+    await repo.updateTask(second!.id, { title: 'Practice scales' });
+    expect((await db.tasks.get(first!.id))!.title).toBe('Practice');
+    expect((await db.tasks.get(first!.id))!.status).toBe('completed');
+  });
+});
+
+describe('journal', () => {
+  it('saves content and survives a fresh connection', async () => {
+    const e = await repo.createEntry({ dateKey: '2026-10-10', kind: 'learning', timeZone: TZ });
+    const text = 'First paragraph.\n\nSecond paragraph.\n\nThird paragraph.';
+    await repo.saveEntry(e.id, content(text), e.revision);
+    const reopened = new AppDatabase(db.name);
+    const stored = await reopened.entries.get(e.id);
+    reopened.close();
+    expect(stored!.plainText).toBe(text);
+    expect(stored!.dateKey).toBe('2026-10-10');
+  });
+
+  it('refuses a stale save and keeps the stored version unchanged', async () => {
+    const e = await repo.createEntry({ dateKey: '2026-10-10', kind: 'doing', timeZone: TZ });
+    const saved = await repo.saveEntry(e.id, content('From tab one'), e.revision);
+    await expect(repo.saveEntry(e.id, content('From tab two'), e.revision)).rejects.toBeInstanceOf(ConflictError);
+    expect((await db.entries.get(e.id))!.plainText).toBe('From tab one');
+    const overwritten = await repo.saveEntryOverConflict(e.id, content('From tab two'));
+    expect(overwritten.revision).toBe(saved.revision + 1);
+    const history = await repo.entryRevisions(e.id);
+    expect(history.some((r) => r.cause === 'conflict' && r.plainText === 'From tab one')).toBe(true);
+  });
+
+  it('documented needs nonblank text and is withdrawn when emptied', async () => {
+    const e = await repo.createEntry({ dateKey: '2026-10-10', kind: 'reflection', timeZone: TZ });
+    await expect(repo.setDocumented(e.id, true)).rejects.toThrow(/Write something/);
+    const s = await repo.saveEntry(e.id, content('Something real'), e.revision);
+    const d = await repo.setDocumented(s.id, true);
+    expect(d.documentedAt).not.toBeNull();
+    const emptied = await repo.saveEntry(e.id, content(''), d.revision);
+    expect(emptied.documentedAt).toBeNull();
+  });
+
+  it('keeps bounded history and a recoverable copy before delete', async () => {
+    const e = await repo.createEntry({ dateKey: '2026-10-10', kind: 'learning', timeZone: TZ });
+    let rev = e.revision;
+    for (let i = 0; i < 60; i++) {
+      clock = new Date(clock.getTime() + 6 * 60 * 1000);
+      rev = (await repo.saveEntry(e.id, content(`Version ${i}`), rev)).revision;
+    }
+    await repo.deleteEntry(e.id);
+    const history = await repo.entryRevisions(e.id);
+    expect(history.filter((r) => r.cause === 'checkpoint').length).toBeLessThanOrEqual(40);
+    const beforeDelete = history.find((r) => r.cause === 'before-delete');
+    expect(beforeDelete!.plainText).toBe('Version 59');
+    const restored = await repo.restoreRevision(e.id, beforeDelete!.id);
+    expect(restored.deletedAt).toBeNull();
+    expect(restored.plainText).toBe('Version 59');
+  });
+
+  it('rapid autosaves refresh one checkpoint instead of piling up', async () => {
+    const e = await repo.createEntry({ dateKey: '2026-10-10', kind: 'learning', timeZone: TZ });
+    let rev = e.revision;
+    for (let i = 0; i < 10; i++) {
+      clock = new Date(clock.getTime() + 1000);
+      rev = (await repo.saveEntry(e.id, content(`Typing ${i}`), rev)).revision;
+    }
+    const history = await repo.entryRevisions(e.id);
+    expect(history).toHaveLength(1);
+    expect(history[0]!.plainText).toBe('Typing 9');
+  });
+});

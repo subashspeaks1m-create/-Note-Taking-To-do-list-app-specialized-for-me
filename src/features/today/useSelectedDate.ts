@@ -33,5 +33,7 @@ export function useSelectedDate() {
     [setParams, today],
   );
 
-  return { today, selected, relation, select, timeZone: PROFILE_DEFAULTS.timeZone };
+  const explicit = raw !== null && isDateKey(raw);
+
+  return { today, selected, relation, select, explicit, timeZone: PROFILE_DEFAULTS.timeZone };
 }

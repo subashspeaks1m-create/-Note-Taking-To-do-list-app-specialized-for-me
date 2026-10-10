@@ -1,7 +1,14 @@
-import { useCallback, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useDisplayPrefs, useIsMobile, useMediaQuery } from '../../app/displayPrefs';
 import { Icon } from '../../components/Icon';
+import { useToast } from '../../components/Toasts';
+import { formatLong, type DateKey } from '../../date/localDate';
+import type { EntryKind, ID, JournalEntry, Task } from '../../domain/models';
+import { useEntriesForDate, useTasksByIds, useTasksForDate } from '../../storage/queries';
+import { useRepo, useStorage } from '../../storage/StorageProvider';
 import { JournalPane } from '../journal/JournalPane';
+import { readDraft } from '../journal/useEntryAutosave';
 import { TaskPane } from '../tasks/TaskPane';
 import { DateControl } from './DateControl';
 import { DirectionColumn } from './DirectionColumn';
@@ -12,18 +19,159 @@ const MIN_RATIO = 0.3;
 const MAX_RATIO = 0.6;
 
 export function TodayPage() {
-  const { today, selected, relation, select, timeZone } = useSelectedDate();
+  const { today, selected, relation, select, timeZone, explicit } = useSelectedDate();
   const { prefs, setPref } = useDisplayPrefs();
+  const repo = useRepo();
+  const { db } = useStorage();
+  const toast = useToast();
   const isMobile = useIsMobile();
   const wideEnoughForDirection = useMediaQuery('(min-width: 1200px)');
   const [mobileTab, setMobileTab] = useState<'tasks' | 'log'>('tasks');
   const [directionOpen, setDirectionOpen] = useState(false);
+  // The open entry belongs to one date; switching days closes it (its editor saves on the way out).
+  const [active, setActive] = useState<{ date: DateKey; id: ID } | null>(null);
+  const [justCompleted, setJustCompleted] = useState<Task | null>(null);
+  const [newDay, setNewDay] = useState<DateKey | null>(null);
+  const activeEntryId = active?.date === selected ? active.id : null;
+
+  const tasks = useTasksForDate(selected);
+  const entries = useEntriesForDate(selected);
+  const linkedIds = useMemo(() => [...new Set((entries ?? []).flatMap((e) => e.taskIds))], [entries]);
+  const linkedTasks = useTasksByIds(linkedIds);
+  const dayTasks = useMemo(() => {
+    const map = new Map<ID, Task>();
+    for (const t of tasks ?? []) map.set(t.id, t);
+    for (const t of linkedTasks ?? []) if (!t.deletedAt) map.set(t.id, t);
+    return [...map.values()];
+  }, [tasks, linkedTasks]);
+
+  // Which tasks already have a log anywhere (so rows can show "Logged").
+  const taskIdsKey = (tasks ?? []).map((t) => t.id).join(',');
+  const loggedTaskIds = useLiveQuery(
+    async () => {
+      const ids = taskIdsKey ? taskIdsKey.split(',') : [];
+      if (!ids.length) return new Set<ID>();
+      const rows = await db.entries.where('taskIds').anyOf(ids).toArray();
+      return new Set(rows.filter((e) => !e.deletedAt && e.plainText.trim()).flatMap((e) => e.taskIds));
+    },
+    [db, taskIdsKey],
+    new Set<ID>(),
+  );
+
+  // Midnight: if an entry is open on the old day, keep it there and offer the new day.
+  const prevToday = useRef(today);
+  useEffect(() => {
+    const old = prevToday.current;
+    if (old === today) return;
+    prevToday.current = today;
+    if (!explicit && active?.date === old) {
+      select(old);
+      setNewDay(today);
+    }
+  }, [today, explicit, active, select]);
+
+  const discardIfEmpty = useCallback(
+    (entry: JournalEntry | undefined) => {
+      if (!entry || entry.plainText.trim() || entry.title.trim() || readDraft(entry.id)) return;
+      void repo.discardEmptyEntry(entry.id);
+    },
+    [repo],
+  );
+
+  const activate = useCallback(
+    (id: ID | null) => {
+      const previous = entries?.find((e) => e.id === activeEntryId);
+      if (previous && previous.id !== id) discardIfEmpty(previous);
+      setActive(id ? { date: selected, id } : null);
+    },
+    [entries, activeEntryId, discardIfEmpty, selected],
+  );
+
+  const newEntry = useCallback(
+    async (kind: EntryKind, taskIds: ID[] = []) => {
+      try {
+        const entry = await repo.createEntry({ dateKey: selected, kind, taskIds, timeZone });
+        activate(entry.id);
+        if (isMobile) setMobileTab('log');
+      } catch (e) {
+        toast({ message: `Couldn't start an entry. ${(e as Error).message}`, tone: 'error' });
+      }
+    },
+    [repo, selected, timeZone, activate, isMobile, toast],
+  );
+
+  const writeLog = useCallback(
+    (task: Task) => {
+      setJustCompleted(null);
+      const existing = entries?.find((e) => e.taskIds.includes(task.id));
+      if (existing) {
+        activate(existing.id);
+        if (isMobile) setMobileTab('log');
+      } else {
+        void newEntry(task.category, [task.id]);
+      }
+    },
+    [entries, activate, newEntry, isMobile],
+  );
+
+  const onCompleted = useCallback((task: Task) => setJustCompleted(task), []);
+
+  const taskPane = (
+    <TaskPane
+      date={selected}
+      today={today}
+      relation={relation}
+      timeZone={timeZone}
+      loggedTaskIds={loggedTaskIds}
+      onWriteLog={writeLog}
+      onCompleted={onCompleted}
+    />
+  );
+  const journalPane = (
+    <JournalPane
+      date={selected}
+      relation={relation}
+      timeZone={timeZone}
+      entries={entries}
+      dayTasks={dayTasks}
+      activeEntryId={activeEntryId}
+      onActivate={activate}
+      onCloseEntry={(e) => {
+        setActive(null);
+        discardIfEmpty(e);
+      }}
+      onNewEntry={(kind) => void newEntry(kind)}
+      justCompleted={justCompleted?.scheduledDate === selected || relation === 'today' ? justCompleted : null}
+      onWriteLog={writeLog}
+      onDismissCompleted={() => setJustCompleted(null)}
+    />
+  );
+
+  const openTasks = (tasks ?? []).filter((t) => t.status === 'todo' || t.status === 'in-progress').length;
 
   return (
     <div className={`today ${wideEnoughForDirection ? 'today--with-direction' : ''}`}>
       {wideEnoughForDirection && <DirectionColumn selected={selected} today={today} />}
 
       <div className="today__main">
+        {newDay && newDay !== selected && (
+          <div className="notice notice--info" role="status">
+            <span>It's a new day. Your open entry stays on {formatLong(selected)}.</span>
+            <div className="notice__actions">
+              <button
+                type="button"
+                className="btn btn--quiet btn--sm"
+                onClick={() => {
+                  select(newDay);
+                  setNewDay(null);
+                }}
+              >
+                Go to {formatLong(newDay).replace(/, \d{4}$/, '')}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="today__top">
           <DateControl selected={selected} today={today} relation={relation} onSelect={select} compact={isMobile} />
           {!wideEnoughForDirection && (
@@ -52,26 +200,22 @@ export function TodayPage() {
           <div className="mobile-workbench">
             <div className="tabs" role="tablist" aria-label="Today's work">
               <button type="button" role="tab" id="tab-tasks" aria-selected={mobileTab === 'tasks'} aria-controls="panel-tasks" className="tabs__tab" onClick={() => setMobileTab('tasks')}>
-                Tasks <span className="tabs__count tabular">0</span>
+                Tasks <span className="tabs__count tabular" aria-label={`${openTasks} open`}>{openTasks}</span>
               </button>
               <button type="button" role="tab" id="tab-log" aria-selected={mobileTab === 'log'} aria-controls="panel-log" className="tabs__tab" onClick={() => setMobileTab('log')}>
-                Log <span className="tabs__count tabular">0</span>
+                Log <span className="tabs__count tabular" aria-label={`${entries?.length ?? 0} entries`}>{entries?.length ?? 0}</span>
+                {activeEntryId && <span className="tabs__dot" aria-label="Entry open" />}
               </button>
             </div>
             <div id="panel-tasks" role="tabpanel" aria-labelledby="tab-tasks" hidden={mobileTab !== 'tasks'}>
-              <TaskPane relation={relation} />
+              {taskPane}
             </div>
             <div id="panel-log" role="tabpanel" aria-labelledby="tab-log" hidden={mobileTab !== 'log'}>
-              <JournalPane selected={selected} />
+              {journalPane}
             </div>
           </div>
         ) : (
-          <Workbench
-            ratio={prefs.splitRatio}
-            onRatio={(r) => setPref('splitRatio', r)}
-            left={<TaskPane relation={relation} />}
-            right={<JournalPane selected={selected} />}
-          />
+          <Workbench ratio={prefs.splitRatio} onRatio={(r) => setPref('splitRatio', r)} left={taskPane} right={journalPane} />
         )}
       </div>
     </div>
@@ -81,8 +225,8 @@ export function TodayPage() {
 interface WorkbenchProps {
   ratio: number;
   onRatio: (ratio: number) => void;
-  left: React.ReactNode;
-  right: React.ReactNode;
+  left: ReactNode;
+  right: ReactNode;
 }
 
 /** Two-pane workbench with a pointer- and keyboard-resizable divider. */

@@ -1,0 +1,117 @@
+import { memo, type KeyboardEvent, type PointerEvent } from 'react';
+import { Icon } from '../../components/Icon';
+import { Menu, type MenuItem } from '../../components/Menu';
+import { formatShort } from '../../date/localDate';
+import type { Task } from '../../domain/models';
+import { PRIORITY_LABEL } from '../../domain/tasks';
+
+export interface TaskRowHandlers {
+  onToggle: (task: Task) => void;
+  onOpen: (task: Task) => void;
+  onWriteLog: (task: Task) => void;
+  menuItems: (task: Task) => (MenuItem | 'separator')[];
+}
+
+interface Props extends TaskRowHandlers {
+  task: Task;
+  /** Shown in carry-over lists: where the task came from. */
+  showOrigin?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (task: Task, selected: boolean) => void;
+  reorderable?: boolean;
+  dragging?: boolean;
+  dragOffset?: number;
+  onHandlePointerDown?: (e: PointerEvent<HTMLButtonElement>, task: Task) => void;
+  onHandleKeyDown?: (e: KeyboardEvent<HTMLButtonElement>, task: Task) => void;
+  hasLog?: boolean;
+}
+
+function formatTime(t: string): string {
+  const [h, m] = t.split(':').map(Number);
+  const suffix = h! >= 12 ? 'PM' : 'AM';
+  return `${((h! + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${suffix}`;
+}
+
+export const TaskRow = memo(function TaskRow({
+  task, showOrigin, selectable, selected, onSelect, reorderable, dragging, dragOffset = 0, onToggle, onOpen, onWriteLog,
+  menuItems, onHandlePointerDown, onHandleKeyDown, hasLog,
+}: Props) {
+  const done = task.status === 'completed';
+  const canceled = task.status === 'canceled';
+  const moved = task.originalScheduledDate && task.scheduledDate && task.originalScheduledDate !== task.scheduledDate;
+
+  return (
+    <li
+      className={`task task--${task.category} task--${task.status} ${dragging ? 'task--dragging' : ''} ${selected ? 'task--selected' : ''}`}
+      style={dragging ? { transform: `translateY(${dragOffset}px)` } : undefined}
+      data-task-id={task.id}
+    >
+      {reorderable && (
+        <button
+          type="button"
+          className="task__handle"
+          aria-label={`Reorder ${task.title}. Use up and down arrow keys`}
+          onPointerDown={(e) => onHandlePointerDown?.(e, task)}
+          onKeyDown={(e) => onHandleKeyDown?.(e, task)}
+        >
+          <span aria-hidden="true">⋮⋮</span>
+        </button>
+      )}
+      {selectable ? (
+        <label className="task__check task__check--select">
+          <input type="checkbox" checked={!!selected} onChange={(e) => onSelect?.(task, e.target.checked)} aria-label={`Select ${task.title}`} />
+          <span className="task__box" aria-hidden="true">
+            {selected && <Icon name="check" size={14} />}
+          </span>
+        </label>
+      ) : (
+        <label className="task__check">
+          <input
+            type="checkbox"
+            checked={done}
+            disabled={canceled}
+            onChange={() => onToggle(task)}
+            aria-label={`${done ? 'Mark not done' : 'Complete'}: ${task.title}`}
+          />
+          <span className="task__box" aria-hidden="true">
+            {done && <Icon name="check" size={14} />}
+          </span>
+        </label>
+      )}
+
+      <div className="task__main">
+        <button type="button" className="task__title" onClick={() => onOpen(task)}>
+          {task.title}
+        </button>
+        <div className="task__meta">
+          <span className={`task__cat task__cat--${task.category}`}>
+            <span aria-hidden="true">{task.category === 'learning' ? '◆' : '▲'}</span>
+            {task.category === 'learning' ? 'Learning' : 'Doing'}
+          </span>
+          {task.status === 'in-progress' && <span className="task__chip task__chip--progress">In progress</span>}
+          {canceled && <span className="task__chip">Canceled</span>}
+          {task.dueTime && <span className="task__chip">{formatTime(task.dueTime)}</span>}
+          {task.effort !== 'standard' && <span className="task__chip">{task.effort === 'small' ? 'Small' : 'Deep'}</span>}
+          {task.priority > 0 && <span className={`task__chip task__chip--p${task.priority}`}>{PRIORITY_LABEL[task.priority]} priority</span>}
+          {task.estimatedMinutes && <span className="task__chip">{task.estimatedMinutes} min</span>}
+          {task.seriesId && (
+            <span className="task__chip" title="Repeating task">
+              ↻ Repeats
+            </span>
+          )}
+          {showOrigin && <span className="task__chip task__chip--origin">{task.scheduledDate ? `From ${formatShort(task.scheduledDate)}` : 'Unscheduled'}</span>}
+          {!showOrigin && moved && <span className="task__chip">Moved from {formatShort(task.originalScheduledDate!)}</span>}
+          {hasLog && <span className="task__chip task__chip--log">Logged</span>}
+        </div>
+        {done && !hasLog && (
+          <button type="button" className="task__write" onClick={() => onWriteLog(task)}>
+            <Icon name="pen" size={14} /> Write what happened
+          </button>
+        )}
+      </div>
+
+      <Menu label={`Actions for ${task.title}`} trigger={<Icon name="more" size={18} />} items={menuItems(task)} className="task__menu" />
+    </li>
+  );
+});

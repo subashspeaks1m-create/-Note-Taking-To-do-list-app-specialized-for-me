@@ -55,3 +55,13 @@ describe('local date in a time zone', () => {
     expect(diffDays(before, after)).toBe(1);
   });
 });
+
+import { zonedTimeToInstant, zoneOffsetMinutes } from './localDate';
+
+describe('wall-clock conversion', () => {
+  it('converts a local time in a zone to the right instant', () => {
+    expect(zoneOffsetMinutes(new Date('2026-10-10T00:00:00Z'), 'Asia/Kolkata')).toBe(330);
+    expect(zonedTimeToInstant('2026-10-10', 21 * 60 + 42, 'Asia/Kolkata').toISOString()).toBe('2026-10-10T16:12:00.000Z');
+    expect(zonedTimeToInstant('2027-03-14', 12 * 60, 'America/New_York').toISOString()).toBe('2027-03-14T16:00:00.000Z');
+  });
+});
