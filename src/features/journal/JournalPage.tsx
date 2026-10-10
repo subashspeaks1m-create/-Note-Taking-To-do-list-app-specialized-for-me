@@ -36,7 +36,7 @@ export function JournalPage() {
   if (!data) {
     return (
       <div className="page page--journal">
-        <PageHeader overline="Your written record" title="Journal" />
+        <PageHeader overline="Your written record" title="Journal" art="scroll" artMotion="wiggle" />
         <div className="skeleton-list" aria-hidden="true">
           <span />
           <span />
@@ -57,7 +57,7 @@ export function JournalPage() {
 
   return (
     <div className="page page--journal">
-      <PageHeader overline="Your written record" title="Journal">
+      <PageHeader overline="Your written record" title="Journal" art="scroll" artMotion="wiggle">
         {written > 0 && (
           <button type="button" className="btn btn--quiet" onClick={exportMarkdown} disabled={!results.length}>
             <Icon name="journal" size={16} /> Export Markdown

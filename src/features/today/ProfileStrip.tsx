@@ -1,4 +1,5 @@
 import { memo, useMemo } from 'react';
+import { Art } from '../../components/art/Art';
 import { asset } from '../../app/asset';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
@@ -87,10 +88,10 @@ export function ProfileStrip({ today, collapsed, onToggleCollapsed, timeZone }: 
           <div className="strip__chips">
             <Link
               to="/insights"
-              className={`chip ${streak > 0 ? 'chip--streak' : 'chip--quiet'}`}
+              className={`chip art-host ${streak > 0 ? 'chip--streak' : 'chip--quiet'}`}
               title={`Days in a row with a completed task or documented entry.${habit && streak > 0 && !habit.streak.activeToday ? ' Do one today to keep it going.' : ''}`}
             >
-              <Icon name="flame" size={16} />
+              {streak > 0 ? <Art name="fire" size={18} motion="flicker" /> : <Icon name="flame" size={16} />}
               <span className="tabular">{streak}</span>
               <span>day streak</span>
               {habit && (
@@ -99,8 +100,8 @@ export function ProfileStrip({ today, collapsed, onToggleCollapsed, timeZone }: 
                 </span>
               )}
             </Link>
-            <Link to="/visions#sprint" className={`chip chip--gold ${countdown.state === 'ended' ? 'chip--quiet' : ''}`}>
-              <Icon name="sparkle" size={14} />
+            <Link to="/visions#sprint" className={`chip chip--gold art-host ${countdown.state === 'ended' ? 'chip--quiet' : ''}`}>
+              <Art name="rocket" size={18} motion="float" />
               <span>{countdown.label}</span>
             </Link>
           </div>

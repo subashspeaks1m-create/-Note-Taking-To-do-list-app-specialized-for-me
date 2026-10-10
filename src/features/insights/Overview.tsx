@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Art } from '../../components/art/Art';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { addDays, compareKeys, formatKey, formatMedium, formatShort, startOfWeek, type DateKey, type WeekStart } from '../../date/localDate';
@@ -54,7 +55,8 @@ export function Overview({ source, today, weekStart, goals }: Props) {
       {empty && <p className="ins-empty">Nothing recorded yet. Finish a task or write an entry and these numbers start moving. Every figure counts only what you actually did.</p>}
 
       <section aria-labelledby="vs-heading">
-        <h2 id="vs-heading" className="ins-h2">
+        <h2 id="vs-heading" className="ins-h2 panel__title--art art-host">
+          <Art name="crossed-swords" size={30} motion="wiggle" />
           You vs past you
         </h2>
         <p className="ins-sub">Each period is compared with the same stretch of the one before, so a Wednesday is matched against last Monday to Wednesday.</p>
@@ -67,7 +69,8 @@ export function Overview({ source, today, weekStart, goals }: Props) {
 
       <div className="ins-two">
         <section className="panel" aria-labelledby="bests-heading">
-          <h2 id="bests-heading" className="panel__title">
+          <h2 id="bests-heading" className="panel__title panel__title--art art-host">
+            <Art name="1st-place-medal" size={26} motion="wiggle" />
             Personal bests
           </h2>
           <dl className="bests">
@@ -95,7 +98,8 @@ export function Overview({ source, today, weekStart, goals }: Props) {
         </section>
 
         <section className="panel" aria-labelledby="m30-heading">
-          <h2 id="m30-heading" className="panel__title">
+          <h2 id="m30-heading" className="panel__title panel__title--art art-host">
+            <Art name="hourglass-done" size={26} motion="spin" />
             Last 30 days
           </h2>
           <p className="panel__sub">
@@ -113,7 +117,8 @@ export function Overview({ source, today, weekStart, goals }: Props) {
       <section className="panel" aria-labelledby="trend-heading">
         <div className="panel__head">
           <div>
-            <h2 id="trend-heading" className="panel__title">
+            <h2 id="trend-heading" className="panel__title panel__title--art art-host">
+              <Art name="chart-increasing" size={26} motion="pop" />
               12-week trend
             </h2>
             <p className="panel__sub">Points per week: 1 per finished task, entry, or goal log.</p>
@@ -123,7 +128,8 @@ export function Overview({ source, today, weekStart, goals }: Props) {
       </section>
 
       <section className="panel" aria-labelledby="heat-heading">
-        <h2 id="heat-heading" className="panel__title">
+        <h2 id="heat-heading" className="panel__title panel__title--art art-host">
+          <Art name="gem-stone" size={26} motion="spin" />
           Last 6 months
         </h2>
         <Heat source={source} today={today} weekStart={weekStart} />
@@ -132,7 +138,8 @@ export function Overview({ source, today, weekStart, goals }: Props) {
       <section className="panel" aria-labelledby="goals-heading">
         <div className="panel__head">
           <div>
-            <h2 id="goals-heading" className="panel__title">
+            <h2 id="goals-heading" className="panel__title panel__title--art art-host">
+              <Art name="bullseye" size={26} motion="pop" />
               Goals
             </h2>
             <p className="panel__sub">Behind first. Pace compares progress with time passed in the plan.</p>
@@ -163,10 +170,14 @@ export function Overview({ source, today, weekStart, goals }: Props) {
 
 function StreakBlock({ title, streak, big, tone }: { title: string; streak: Streak; big?: boolean; tone?: 'learning' | 'doing' }) {
   return (
-    <div className={`ins-streak ${big ? 'ins-streak--big' : ''} ${tone ? `ins-streak--${tone}` : ''} ${streak.current > 0 ? 'is-lit' : ''}`}>
+    <div className={`ins-streak art-host ${big ? 'ins-streak--big' : ''} ${tone ? `ins-streak--${tone}` : ''} ${streak.current > 0 ? 'is-lit' : ''}`}>
       <p className="ins-label">{title}</p>
       <p className="ins-big tabular">
-        <Icon name="flame" size={big ? 30 : 18} />
+        {streak.current > 0 ? (
+          <Art name={tone === 'learning' ? 'books' : tone === 'doing' ? 'high-voltage' : 'fire'} size={big ? 40 : 22} motion={tone ? 'bounce' : 'flicker'} />
+        ) : (
+          <Icon name="flame" size={big ? 30 : 18} />
+        )}
         {streak.current}
         <span className="ins-big__of"> day{streak.current === 1 ? '' : 's'}</span>
       </p>

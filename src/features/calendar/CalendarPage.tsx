@@ -138,7 +138,7 @@ export function CalendarPage() {
 
   return (
     <div className="page page--calendar">
-      <PageHeader overline="Plan and look back" title="Calendar">
+      <PageHeader overline="Plan and look back" title="Calendar" art="spiral-calendar" artMotion="wiggle">
         <div className="segmented" role="group" aria-label="Calendar view">
           <button type="button" className="segmented__btn" aria-pressed={view === 'month'} onClick={() => setView('month')}>
             Month

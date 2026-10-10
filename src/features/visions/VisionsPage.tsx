@@ -50,7 +50,7 @@ export function VisionsPage() {
 
   return (
     <div className="page">
-      <PageHeader overline="Connected horizons" title="Visions">
+      <PageHeader overline="Connected horizons" title="Visions" art="crystal-ball" artMotion="float">
         <div className="segmented" role="group" aria-label="View">
           <button type="button" className="segmented__btn" aria-pressed={view === 'cards'} onClick={() => setView('cards')}>
             Board

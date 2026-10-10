@@ -25,7 +25,7 @@ export function CharacterPage() {
 
   return (
     <div className="page">
-      <PageHeader overline="Character Chamber" title="Your character" />
+      <PageHeader overline="Character Chamber" title="Your character" art="shield" artMotion="pop" />
 
       <section className="chamber" aria-label="Equipped character">
         <div className="chamber__stage">

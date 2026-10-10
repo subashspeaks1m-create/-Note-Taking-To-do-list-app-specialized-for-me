@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { asset } from './asset';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Icon, type IconName } from '../components/Icon';
+import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom';
+import { Art } from '../components/art/Art';
+import { BrandMark } from '../components/art/BrandMark';
+import { LiveIcon } from '../components/art/LiveIcon';
+import type { LiveIconName } from '../components/art/liveIcons';
+import { Icon } from '../components/Icon';
 import { APP_NAME } from '../domain/config';
 import { formatShort } from '../date/localDate';
 import { periodRange } from '../domain/stats';
@@ -15,7 +18,7 @@ const PREVIEW_STAGE = 4;
 interface Destination {
   to: string;
   label: string;
-  icon: IconName;
+  icon: LiveIconName;
   mobilePrimary: boolean;
 }
 
@@ -81,8 +84,8 @@ function ReportReady({ inbox }: { inbox: ReportInbox }) {
       ? `week of ${formatShort(range.start)} – ${formatShort(range.end)}`
       : new Date(`${range.start}T12:00:00Z`).toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
   return (
-    <div className="report-ready" role="status">
-      <Icon name="insights" size={20} />
+    <div className="report-ready art-host" role="status">
+      <Art name="wrapped-gift" size={30} motion="shake" />
       <p className="report-ready__text">
         <strong>Your {item.kind === 'week' ? 'weekly' : 'monthly'} report is ready.</strong> Growth, daily activity and mistakes for the {label}.
       </p>
@@ -101,19 +104,13 @@ function Rail({ inbox }: { inbox: ReportInbox }) {
   return (
     <nav className="rail" aria-label="Main">
       <div className="rail__brand">
-        <img src={asset('/assets/ui/logo-mark.svg')} alt="" width={34} height={34} />
+        <BrandMark size={36} />
         <span className="rail__wordmark">{APP_NAME}</span>
       </div>
       <ul className="rail__list">
         {DESTINATIONS.map((d) => (
           <li key={d.to}>
-            <NavLink to={d.to} end={d.to === '/'} className="rail__link" title={prefs.railCollapsed ? d.label : undefined}>
-              <span className="rail__icon">
-                <Icon name={d.icon} size={22} />
-              </span>
-              <span className="rail__label">{d.label}</span>
-              {d.to === '/insights' && inbox.unseen > 0 && <span className="nav-badge" aria-label="New report" />}
-            </NavLink>
+            <RailLink d={d} collapsed={prefs.railCollapsed} badge={d.to === '/insights' && inbox.unseen > 0} />
           </li>
         ))}
       </ul>
@@ -128,6 +125,36 @@ function Rail({ inbox }: { inbox: ReportInbox }) {
         <span className="visually-hidden">{prefs.railCollapsed ? 'Expand navigation labels' : 'Collapse navigation labels'}</span>
       </button>
     </nav>
+  );
+}
+
+/** Replays an icon's drawing on hover or focus, and whenever its route becomes active. */
+function useReplay(d: Destination) {
+  const [plays, setPlays] = useState(0);
+  const active = !!useMatch({ path: d.to, end: d.to === '/' });
+  return { play: `${plays}-${active}`, replay: () => setPlays((n) => n + 1) };
+}
+
+function RailLink({ d, collapsed, badge }: { d: Destination; collapsed: boolean; badge: boolean }) {
+  const { play, replay } = useReplay(d);
+  return (
+    <NavLink to={d.to} end={d.to === '/'} className="rail__link" title={collapsed ? d.label : undefined} onMouseEnter={replay} onFocus={replay}>
+      <span className="rail__icon">
+        <LiveIcon name={d.icon} size={22} play={play} />
+      </span>
+      <span className="rail__label">{d.label}</span>
+      {badge && <span className="nav-badge" aria-label="New report" />}
+    </NavLink>
+  );
+}
+
+function BottomLink({ d }: { d: Destination }) {
+  const { play, replay } = useReplay(d);
+  return (
+    <NavLink to={d.to} end={d.to === '/'} className="bottom-bar__link" onMouseEnter={replay} onFocus={replay}>
+      <LiveIcon name={d.icon} size={22} play={play} />
+      <span>{d.label}</span>
+    </NavLink>
   );
 }
 
@@ -162,10 +189,7 @@ function BottomBar({ inbox }: { inbox: ReportInbox }) {
     <>
       <nav className="bottom-bar" aria-label="Main">
         {DESTINATIONS.filter((d) => d.mobilePrimary).map((d) => (
-          <NavLink key={d.to} to={d.to} end={d.to === '/'} className="bottom-bar__link">
-            <Icon name={d.icon} size={22} />
-            <span>{d.label}</span>
-          </NavLink>
+          <BottomLink key={d.to} d={d} />
         ))}
         <button
           ref={moreRef}

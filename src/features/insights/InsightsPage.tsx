@@ -43,7 +43,7 @@ export function InsightsPage() {
 
   return (
     <div className="page page--insights">
-      <PageHeader overline="Truthful numbers" title="Insights" />
+      <PageHeader overline="Truthful numbers" title="Insights" art="trophy" artMotion="bounce" />
       <div className="segmented ins-tabs" role="tablist" aria-label="Insights view">
         {TABS.map((t) => {
           const isNew = (t.id === 'week' && inbox.week.isNew) || (t.id === 'month' && inbox.month.isNew);

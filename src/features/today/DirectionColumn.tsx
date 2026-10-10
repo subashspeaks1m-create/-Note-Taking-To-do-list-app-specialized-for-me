@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Art } from '../../components/art/Art';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toasts';
@@ -125,7 +126,10 @@ export function DirectionColumn({ selected, today }: Props) {
   return (
     <aside className="direction" aria-label="Your direction">
       <p className="overline">The bigger picture</p>
-      <h2 className="direction__title">Your direction</h2>
+      <h2 className="direction__title panel__title--art art-host">
+        <Art name="compass" size={26} motion="spin" />
+        Your direction
+      </h2>
 
       <div className="direction__slots">
         {periods.map((p) => (

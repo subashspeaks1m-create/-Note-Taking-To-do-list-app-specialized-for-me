@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type PointerEvent } from 'react';
+import { Art } from '../../components/art/Art';
+import { TaskEmblem } from '../../components/art/TaskEmblem';
 import { Icon } from '../../components/Icon';
 import type { MenuItem } from '../../components/Menu';
 import { useToast } from '../../components/Toasts';
@@ -239,10 +241,20 @@ export function TaskPane({ date, today, relation, timeZone, loggedTaskIds, onWri
   return (
     <section className="pane pane--tasks" aria-labelledby="tasks-heading">
       <header className="pane__head">
-        <h2 id="tasks-heading" className="pane__title">
-          What I'll do
-        </h2>
-        <span className="pane__meta tabular">{counts.total === 0 ? 'No tasks' : `${counts.done} / ${counts.total} complete`}</span>
+        <div className="pane__title-row">
+          <TaskEmblem done={counts.done} total={counts.total} />
+          <h2 id="tasks-heading" className="pane__title">
+            What I'll do
+          </h2>
+        </div>
+        {counts.total > 0 && counts.done === counts.total ? (
+          <span className="pane__meta all-clear art-host">
+            <Art name="party-popper" size={22} motion="pop" />
+            All clear · {counts.total} / {counts.total}
+          </span>
+        ) : (
+          <span className="pane__meta tabular">{counts.total === 0 ? 'No tasks' : `${counts.done} / ${counts.total} complete`}</span>
+        )}
       </header>
 
       <form

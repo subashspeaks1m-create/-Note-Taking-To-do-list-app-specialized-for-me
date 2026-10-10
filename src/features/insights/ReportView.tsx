@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Art } from '../../components/art/Art';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toasts';
@@ -96,7 +97,8 @@ export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, 
           <ReviewForm key={`${kind}-${range.start}-${direction?.version ?? 0}`} kind={kind} range={range} nextRange={nextRange} direction={direction} nextDirection={nextDirection} />
 
           <section className="panel" aria-labelledby="evidence-heading">
-            <h2 id="evidence-heading" className="panel__title">
+            <h2 id="evidence-heading" className="panel__title panel__title--art art-host">
+              <Art name="scroll" size={26} motion="wiggle" />
               Evidence
             </h2>
             <p className="panel__sub">Pulled from what you recorded. Tap to open.</p>
@@ -192,7 +194,8 @@ function ReviewForm({
 
   return (
     <section className="panel" aria-labelledby="review-heading">
-      <h2 id="review-heading" className="panel__title">
+      <h2 id="review-heading" className="panel__title panel__title--art art-host">
+        <Art name="writing-hand" size={26} motion="wiggle" />
         Your review
       </h2>
       <p className="panel__sub">{direction?.reviewedAt ? 'Saved. Edit any time.' : `Two minutes, in your own words. This becomes part of your ${label}'s record.`}</p>

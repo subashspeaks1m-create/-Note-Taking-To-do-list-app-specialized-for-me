@@ -11,6 +11,7 @@ import './styles/visions.css';
 import './styles/calendar.css';
 import './styles/journal.css';
 import './styles/insights.css';
+import './styles/art.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
