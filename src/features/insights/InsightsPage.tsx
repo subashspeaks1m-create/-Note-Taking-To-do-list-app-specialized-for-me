@@ -1,27 +1,87 @@
-import { EmptyState, PageHeader, StageNote } from '../../components/Page';
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { PageHeader } from '../../components/Page';
+import { isDateKey, type DateKey } from '../../date/localDate';
+import { periodRange } from '../../domain/stats';
+import { useActivitySource, useGoalBoard } from '../../storage/queries';
+import { useProfile } from '../../storage/StorageProvider';
+import { buildBoard } from '../visions/boardModel';
+import { Overview } from './Overview';
+import { useReportInbox } from './reportInbox';
+import { ReportView } from './ReportView';
 
-const METRICS = [
-  { label: 'Tasks completed', def: 'Completed tasks in the selected range.' },
-  { label: 'Completion rate', def: 'Completed ÷ scheduled tasks that were not canceled.' },
-  { label: 'Documented entries', def: 'Logs you explicitly marked as documented.' },
-  { label: 'Current streak', def: 'Days in a row with a completed task or documented log.' },
+type Tab = 'overview' | 'week' | 'month';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'week', label: 'Weekly report' },
+  { id: 'month', label: 'Monthly report' },
 ];
+const PACE_ORDER = ['behind', 'not-started', 'on-pace', 'ahead', 'ended', 'unmeasured', 'done'];
 
 export function InsightsPage() {
+  const profile = useProfile();
+  const inbox = useReportInbox();
+  const { today, minutesNow } = inbox;
+  const weekStart = profile.weekStart ?? 'monday';
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = params.get('tab') === 'week' || params.get('tab') === 'month' ? (params.get('tab') as Tab) : 'overview';
+  const source = useActivitySource();
+  const board = useGoalBoard();
+  const goals = useMemo(() => {
+    if (!board) return [];
+    const views = [...buildBoard(board, today).goalViews.values()].filter((g) => g.goal.status === 'active' || g.goal.status === 'achieved');
+    return views.sort((a, b) => PACE_ORDER.indexOf(a.pace.state) - PACE_ORDER.indexOf(b.pace.state));
+  }, [board, today]);
+  const goalsBehind = goals.filter((g) => g.pace.state === 'behind').map((g) => g.goal.title);
+
+  const reportKind = tab === 'month' ? 'month' : 'week';
+  const fromUrl = params.get('p');
+  const anchor: DateKey = fromUrl && isDateKey(fromUrl) ? periodRange(reportKind, fromUrl, weekStart).start : inbox[reportKind].anchor;
+
+  const setTab = (t: Tab) => setParams(t === 'overview' ? {} : { tab: t }, { replace: true });
+  const setAnchor = (p: DateKey) => setParams({ tab, p }, { replace: true });
+
   return (
-    <div className="page">
-      <PageHeader overline="Truthful numbers" title="Insights" />
-      <div className="metric-grid">
-        {METRICS.map((m) => (
-          <div key={m.label} className="metric">
-            <p className="metric__label">{m.label}</p>
-            <p className="metric__value metric__value--none">No data yet</p>
-            <p className="metric__def">{m.def}</p>
-          </div>
-        ))}
+    <div className="page page--insights">
+      <PageHeader overline="Truthful numbers" title="Insights" art="trophy" artMotion="bounce" />
+      <div className="segmented ins-tabs" role="tablist" aria-label="Insights view">
+        {TABS.map((t) => {
+          const isNew = (t.id === 'week' && inbox.week.isNew) || (t.id === 'month' && inbox.month.isNew);
+          return (
+            <button key={t.id} type="button" role="tab" className="segmented__btn" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
+              {t.label}
+              {isNew && (
+                <span className="new-dot" aria-label="new">
+                  New
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
-      <EmptyState icon="insights" title="Nothing to measure yet." body="Insights only count what you actually record. Every number will show its date range and sample size." />
-      <StageNote stage={4}>Trends, weekly and monthly reviews and category breakdowns arrive in stage 4.</StageNote>
+
+      {!source ? (
+        <div className="skeleton-list" aria-hidden="true">
+          <span />
+          <span />
+        </div>
+      ) : tab === 'overview' ? (
+        <Overview source={source} today={today} weekStart={weekStart} goals={goals} />
+      ) : (
+        <ReportView
+          key={reportKind}
+          kind={reportKind}
+          anchor={anchor}
+          onAnchor={setAnchor}
+          source={source}
+          today={today}
+          minutesNow={minutesNow}
+          weekStart={weekStart}
+          name={profile.displayName}
+          goalsBehind={goalsBehind}
+          markSeen={inbox.markSeen}
+        />
+      )}
     </div>
   );
 }

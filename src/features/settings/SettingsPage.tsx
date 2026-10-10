@@ -1,4 +1,5 @@
 import { useDisplayPrefs, type DisplayPrefs } from '../../app/displayPrefs';
+import { Art } from '../../components/art/Art';
 import { PageHeader, StageNote } from '../../components/Page';
 import { APP_NAME, PROFILE_DEFAULTS } from '../../domain/config';
 
@@ -23,7 +24,7 @@ function Choice<K extends keyof DisplayPrefs>({ label, prefKey, options }: { lab
 export function SettingsPage() {
   return (
     <div className="page page--narrow">
-      <PageHeader overline={APP_NAME} title="Settings" />
+      <PageHeader overline={APP_NAME} title="Settings" art="gear" artMotion="spin" />
 
       <section className="settings-group" aria-labelledby="sg-profile">
         <h2 id="sg-profile" className="settings-group__title">
@@ -51,6 +52,26 @@ export function SettingsPage() {
         <Choice label="Motion" prefKey="motion" options={[{ value: 'system', label: 'Match device' }, { value: 'full', label: 'Full' }, { value: 'reduced', label: 'Reduced' }]} />
         <Choice label="Character playback" prefKey="avatarPlayback" options={[{ value: 'auto', label: 'Animated' }, { value: 'still', label: 'Still image' }]} />
         <Choice label="Graphics" prefKey="lowGraphics" options={[{ value: false, label: 'Full' }, { value: true, label: 'Low' }]} />
+      </section>
+
+      <section className="settings-group" aria-labelledby="sg-credits">
+        <h2 id="sg-credits" className="settings-group__title">
+          Art credits
+        </h2>
+        <div className="credits__art">
+          {(['fire', 'gem-stone', 'trophy', 'crystal-ball', 'shield', 'rocket', 'party-popper', 'wrapped-gift'] as const).map((n) => (
+            <Art key={n} name={n} size={30} motion="bounce" />
+          ))}
+        </div>
+        <ul className="credits">
+          <li>
+            Color art: <a href="https://github.com/microsoft/fluentui-emoji">Fluent Emoji</a> by Microsoft, MIT License.
+          </li>
+          <li>
+            Self-drawing navigation icons: <a href="https://github.com/cyberalien/line-md">Material Line Icons (line-md)</a> by Vjacheslav Trushkin, MIT License.
+          </li>
+          <li>Logo, task emblem, calendar levels and bursts: drawn for this app.</li>
+        </ul>
       </section>
 
       <StageNote stage={6}>Profile editing, sound, sprint dates, backup and restore, storage status and reset arrive in stage 6.</StageNote>

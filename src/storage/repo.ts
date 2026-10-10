@@ -796,6 +796,50 @@ export class Repository {
     });
   }
 
+  /** Saves the written part of a weekly or monthly review, keeping the period's intention. */
+  async saveReview(input: { kind: 'week' | 'month'; periodKey: string; startDate: DateKey; endDate: DateKey; review: string; blockers: string }): Promise<PeriodDirection> {
+    return this.db.transaction('rw', this.db.periodDirections, async () => {
+      const existing = await this.db.periodDirections.where('[kind+periodKey]').equals([input.kind, input.periodKey]).first();
+      const at = this.iso();
+      const review = input.review.trim();
+      const blockers = input.blockers.trim();
+      const wrote = !!(review || blockers);
+      if (!existing) {
+        const created: PeriodDirection = {
+          id: uuid(),
+          kind: input.kind,
+          periodKey: input.periodKey,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          intention: '',
+          desiredOutcome: '',
+          review,
+          blockers,
+          reviewedAt: wrote ? at : null,
+          updatedAt: at,
+          version: 1,
+          history: [],
+        };
+        await this.db.periodDirections.add(created);
+        return created;
+      }
+      const next: PeriodDirection = {
+        ...existing,
+        review,
+        blockers,
+        reviewedAt: existing.reviewedAt ?? (wrote ? at : null),
+        updatedAt: at,
+        version: existing.version + 1,
+        history: [
+          ...(existing.history ?? []),
+          { at: existing.updatedAt, intention: existing.intention, desiredOutcome: existing.desiredOutcome, review: existing.review, blockers: existing.blockers ?? '' },
+        ].slice(-MAX_DIRECTION_HISTORY),
+      };
+      await this.db.periodDirections.put(next);
+      return next;
+    });
+  }
+
   /** The local date "now" in a zone, from this repository's clock. */
   todayIn(timeZone: string): DateKey {
     return dateKeyInZone(this.now(), timeZone);

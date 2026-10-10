@@ -263,7 +263,8 @@ main:focus-visible {
   border-color: var(--border);
 }
 
-.segmented__btn[aria-pressed='true'] {
+.segmented__btn[aria-pressed='true'],
+.segmented__btn[aria-selected='true'] {
   color: var(--text);
   background: var(--raised-2);
   border-color: var(--border);

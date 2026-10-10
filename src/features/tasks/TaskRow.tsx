@@ -1,4 +1,4 @@
-import { memo, type KeyboardEvent, type PointerEvent } from 'react';
+import { memo, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { Icon } from '../../components/Icon';
 import { Menu, type MenuItem } from '../../components/Menu';
 import { formatShort } from '../../date/localDate';
@@ -42,6 +42,8 @@ export const TaskRow = memo(function TaskRow({
   const done = task.status === 'completed';
   const canceled = task.status === 'canceled';
   const moved = task.originalScheduledDate && task.scheduledDate && task.originalScheduledDate !== task.scheduledDate;
+  // Bumped when the user checks the task off, to play one celebration burst.
+  const [burst, setBurst] = useState(0);
 
   return (
     <li
@@ -73,12 +75,16 @@ export const TaskRow = memo(function TaskRow({
             type="checkbox"
             checked={done}
             disabled={canceled}
-            onChange={() => onToggle(task)}
+            onChange={() => {
+              if (!done) setBurst((n) => n + 1);
+              onToggle(task);
+            }}
             aria-label={`${done ? 'Mark not done' : 'Complete'}: ${task.title}`}
           />
-          <span className="task__box" aria-hidden="true">
+          <span key={`box-${burst}`} className={`task__box ${burst > 0 && done ? 'task__box--pop' : ''}`} aria-hidden="true">
             {done && <Icon name="check" size={14} />}
           </span>
+          {burst > 0 && done && <Burst key={`burst-${burst}`} tone={task.category} />}
         </label>
       )}
 
@@ -122,3 +128,19 @@ export const TaskRow = memo(function TaskRow({
     </li>
   );
 });
+
+const BITS = Array.from({ length: 10 }, (_, i) => i);
+
+/** Confetti, a ring and "+1" thrown from the checkbox when a task is finished. */
+function Burst({ tone }: { tone: Task['category'] }) {
+  const colors = tone === 'learning' ? ['var(--learning)', 'var(--gold)', '#fff'] : ['var(--doing)', 'var(--gold)', '#fff'];
+  return (
+    <span className="burst" aria-hidden="true">
+      <span className="burst__ring" />
+      {BITS.map((i) => (
+        <span key={i} className="burst__bit" style={{ '--a': `${i * 36 + (i % 2) * 12}deg`, '--c': colors[i % 3] } as CSSProperties} />
+      ))}
+      <span className="burst__plus">+1</span>
+    </span>
+  );
+}

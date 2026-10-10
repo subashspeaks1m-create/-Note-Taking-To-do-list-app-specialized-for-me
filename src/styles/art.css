@@ -1,0 +1,419 @@
+/*
+ * Game feel: color art, self-drawing icons, the living brand mark, the task
+ * emblem and completion bursts. Every animation here is decoration; the global
+ * reduced-motion rule in base.css stills all of it.
+ */
+
+/* ---------- Color art ---------- */
+.art {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--art-size);
+  height: var(--art-size);
+  line-height: 0;
+}
+
+.art img {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.35));
+  transform-origin: 50% 80%;
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+
+:is(.art, .art-host):hover .art img,
+.art:hover img {
+  filter: drop-shadow(0 4px 12px rgb(232 196 119 / 0.35));
+}
+
+:is(.art-host:hover, .art:hover) .art--bounce img,
+.art--bounce:hover img {
+  animation: art-bounce 0.7s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+:is(.art-host:hover, .art:hover) .art--wiggle img,
+.art--wiggle:hover img {
+  animation: art-wiggle 0.6s ease-in-out;
+}
+:is(.art-host:hover, .art:hover) .art--spin img,
+.art--spin:hover img {
+  animation: art-spin 0.9s cubic-bezier(0.5, 0, 0.3, 1);
+  transform-origin: 50% 50%;
+}
+:is(.art-host:hover, .art:hover) .art--pop img,
+.art--pop:hover img {
+  animation: art-pop 0.5s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+:is(.art-host:hover, .art:hover) .art--shake img,
+.art--shake:hover img {
+  animation: art-shake 0.5s ease-in-out 2;
+}
+
+.art--flicker img {
+  animation: art-flicker 2.4s ease-in-out infinite;
+}
+:is(.art-host:hover, .art:hover) .art--flicker img,
+.art--flicker:hover img {
+  animation: art-flicker 0.5s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px rgb(255 140 60 / 0.7));
+}
+
+.art--float img {
+  animation: art-float 3.2s ease-in-out infinite;
+}
+:is(.art-host:hover, .art:hover) .art--float img,
+.art--float:hover img {
+  animation: art-float 0.9s ease-in-out infinite;
+}
+
+@keyframes art-bounce {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-28%) scale(0.95, 1.08); }
+  55% { transform: translateY(0) scale(1.12, 0.88); }
+  75% { transform: translateY(-8%) scale(0.98, 1.03); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes art-wiggle {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-14deg); }
+  40% { transform: rotate(11deg); }
+  60% { transform: rotate(-7deg); }
+  80% { transform: rotate(4deg); }
+}
+@keyframes art-spin {
+  from { transform: rotate(0) scale(1); }
+  50% { transform: rotate(200deg) scale(1.15); }
+  to { transform: rotate(360deg) scale(1); }
+}
+@keyframes art-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.3) rotate(-6deg); }
+  100% { transform: scale(1); }
+}
+@keyframes art-shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  25% { transform: translateX(-8%) rotate(-8deg); }
+  75% { transform: translateX(8%) rotate(8deg); }
+}
+@keyframes art-flicker {
+  0%, 100% { transform: scale(1, 1) rotate(0); }
+  25% { transform: scale(0.96, 1.06) rotate(-2deg); }
+  50% { transform: scale(1.03, 0.97) rotate(1deg); }
+  75% { transform: scale(0.98, 1.04) rotate(2deg); }
+}
+@keyframes art-float {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-9%) rotate(3deg); }
+}
+
+/* Page titles carry their art. */
+.page-head__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* ---------- Self-drawing navigation icons ---------- */
+.live-icon {
+  display: block;
+  flex: none;
+  /* The svg remounts on hover/focus; clicks must land on the link, not on a node that disappears mid-click. */
+  pointer-events: none;
+  transition: transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.rail__link:hover .live-icon,
+.bottom-bar__link:hover .live-icon {
+  transform: translateY(-2px) scale(1.12);
+}
+.rail__link.active .live-icon,
+.bottom-bar__link.active .live-icon {
+  filter: drop-shadow(0 0 6px rgb(232 196 119 / 0.55));
+}
+.rail__link:hover .live-icon--settings,
+.bottom-bar__link:hover .live-icon--settings {
+  transform: rotate(90deg) scale(1.1);
+  transition-duration: 0.6s;
+}
+.rail__link:hover .live-icon--vision {
+  transform: rotate(-25deg) scale(1.12);
+}
+
+/* ---------- Living brand mark ---------- */
+.rail__brand {
+  cursor: default;
+}
+.brand-mark {
+  flex: none;
+  overflow: visible;
+}
+.brand-mark__halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: brand-breathe 4s ease-in-out infinite;
+}
+.brand-mark__orbit {
+  opacity: 0.35;
+}
+.brand-mark__outline {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: brand-draw 1.1s 0.15s cubic-bezier(0.6, 0, 0.3, 1) forwards;
+}
+.brand-mark__core {
+  transform-box: fill-box;
+  transform-origin: 50% 60%;
+  animation: brand-core 3.2s ease-in-out infinite;
+}
+.brand-mark__rays line {
+  opacity: 0;
+}
+.brand-mark__spark {
+  filter: drop-shadow(0 0 3px #ffe9b0);
+}
+.rail__brand:hover .brand-mark {
+  animation: brand-spin 0.9s cubic-bezier(0.5, 0, 0.3, 1);
+}
+.rail__brand:hover .brand-mark__rays line {
+  animation: brand-ray 0.9s ease-out;
+}
+.rail__brand:hover .brand-mark__halo {
+  animation: brand-flare 0.9s ease-out;
+}
+.rail__brand:hover .rail__wordmark {
+  background: linear-gradient(100deg, var(--text) 30%, #ffe9b0 50%, var(--text) 70%) 0 0 / 300% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: wordmark-glint 0.9s ease-out;
+}
+
+@keyframes brand-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes brand-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+@keyframes brand-core {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@keyframes brand-spin {
+  from { transform: perspective(160px) rotateY(0); }
+  to { transform: perspective(160px) rotateY(360deg); }
+}
+@keyframes brand-ray {
+  0% { opacity: 0; transform: translateY(6px); }
+  35% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-6px); }
+}
+@keyframes brand-flare {
+  0% { opacity: 0.6; transform: scale(0.9); }
+  40% { opacity: 1; transform: scale(1.25); }
+  100% { opacity: 0.6; transform: scale(0.92); }
+}
+@keyframes wordmark-glint {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+.brand-mark__rays line {
+  transform-box: fill-box;
+}
+
+/* ---------- Task emblem ---------- */
+.pane__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.task-emblem {
+  display: inline-grid;
+  flex: none;
+  line-height: 0;
+  cursor: pointer;
+}
+.task-emblem svg {
+  overflow: visible;
+}
+.task-emblem__arc {
+  transition: stroke-dasharray 0.7s cubic-bezier(0.3, 1.2, 0.5, 1);
+}
+.task-emblem__target,
+.task-emblem__arrow,
+.task-emblem__shock,
+.task-emblem__sparks circle {
+  transform-box: view-box;
+  transform-origin: 24px 24px;
+}
+.task-emblem__arrow {
+  animation: emblem-quiver 5s ease-in-out infinite;
+}
+.task-emblem__shock {
+  opacity: 0;
+}
+.task-emblem__sparks circle {
+  opacity: 0;
+}
+:is(.pane__title-row:hover, .task-emblem:hover) .task-emblem__arrow {
+  animation: emblem-shot 0.75s cubic-bezier(0.5, 0, 0.2, 1);
+}
+:is(.pane__title-row:hover, .task-emblem:hover) .task-emblem__target {
+  animation: emblem-hit 0.75s ease-out;
+}
+:is(.pane__title-row:hover, .task-emblem:hover) .task-emblem__shock {
+  animation: emblem-shock 0.75s ease-out;
+}
+:is(.pane__title-row:hover, .task-emblem:hover) .task-emblem__sparks circle {
+  animation: emblem-spark 0.75s ease-out;
+}
+.task-emblem.is-complete svg {
+  animation: emblem-glow 2.6s ease-in-out infinite;
+}
+
+@keyframes emblem-quiver {
+  0%, 88%, 100% { transform: rotate(0); }
+  91% { transform: rotate(-4deg); }
+  94% { transform: rotate(3deg); }
+  97% { transform: rotate(-1.5deg); }
+}
+@keyframes emblem-shot {
+  0% { transform: translate(0, 0); opacity: 1; }
+  25% { transform: translate(12px, -12px); opacity: 0; }
+  35% { transform: translate(22px, -22px); opacity: 0; }
+  38% { transform: translate(22px, -22px); opacity: 1; }
+  56% { transform: translate(-1.5px, 1.5px); }
+  64% { transform: translate(0, 0) rotate(-6deg); }
+  74% { transform: rotate(4deg); }
+  84% { transform: rotate(-2deg); }
+  100% { transform: translate(0, 0) rotate(0); opacity: 1; }
+}
+@keyframes emblem-hit {
+  0%, 55% { transform: scale(1); }
+  62% { transform: scale(0.88); }
+  75% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@keyframes emblem-shock {
+  0%, 55% { opacity: 0; transform: scale(1); }
+  60% { opacity: 1; }
+  100% { opacity: 0; transform: scale(5); }
+}
+@keyframes emblem-spark {
+  0%, 55% { opacity: 0; transform: scale(0.4); }
+  65% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+@keyframes emblem-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgb(232 196 119 / 0.3)); }
+  50% { filter: drop-shadow(0 0 9px rgb(232 196 119 / 0.75)); }
+}
+
+.all-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* ---------- Completion burst ---------- */
+.task__check {
+  position: relative;
+}
+.burst {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.burst__bit {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c, var(--gold));
+  transform: rotate(var(--a)) translateY(0) scale(1);
+  animation: burst-bit 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.burst__bit:nth-child(even) {
+  width: 4px;
+  height: 9px;
+  border-radius: 2px;
+}
+.burst__ring {
+  position: absolute;
+  top: -14px;
+  left: -14px;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+  animation: burst-ring 0.55s ease-out forwards;
+}
+.burst__plus {
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  font: 800 var(--text-sm) / 1 var(--font-display);
+  color: var(--gold);
+  text-shadow: 0 0 8px rgb(232 196 119 / 0.6);
+  white-space: nowrap;
+  animation: burst-plus 1s ease-out forwards;
+}
+.task__box--pop {
+  animation: art-pop 0.45s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+
+@keyframes burst-bit {
+  to { transform: rotate(var(--a)) translateY(-26px) scale(0.2); opacity: 0; }
+}
+@keyframes burst-ring {
+  from { transform: scale(0.4); opacity: 1; }
+  to { transform: scale(1.8); opacity: 0; }
+}
+@keyframes burst-plus {
+  0% { transform: translateY(4px) scale(0.6); opacity: 0; }
+  20% { transform: translateY(0) scale(1.15); opacity: 1; }
+  100% { transform: translateY(-22px) scale(1); opacity: 0; }
+}
+
+/* ---------- Credits ---------- */
+.credits {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.credits a {
+  color: var(--text);
+}
+.credits__art {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* Section titles with art */
+.panel__title--art {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.chip .art {
+  margin-block: -3px;
+}
+.report-ready .art {
+  margin-block: -4px;
+}
+.live-icon--today {
+  stroke-width: 1.7;
+}

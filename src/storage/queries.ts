@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { compareKeys, type DateKey } from '../date/localDate';
 import type { Goal, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
 import { dayActivity, type DayActivity } from '../domain/intensity';
+import type { ActivitySource } from '../domain/stats';
 import { isOpen } from '../domain/tasks';
 import { useStorage } from './StorageProvider';
 
@@ -142,9 +143,23 @@ export function useDayActivity(start: DateKey, end: DateKey): Map<DateKey, DayAc
   return useLiveQuery(async () => {
     const [tasks, entries, updates] = await Promise.all([
       db.tasks.where('completionLocalDate').between(start, end, true, true).toArray(),
-      db.entries.where('dateKey').between(start, end, true, true).toArray(),
+      db.entries.where('dateKey').between(start, end, true, true).filter((e) => !!e.plainText.trim()).toArray(),
       db.goalUpdates.where('dateKey').between(start, end, true, true).toArray(),
     ]);
     return dayActivity({ tasks, entries, updates });
   }, [db, start, end]);
+}
+
+/** Every activity record, for Insights and reports. Local data stays small enough to load at once. */
+export function useActivitySource(): ActivitySource | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => {
+    const [tasks, entries, updates, moves] = await Promise.all([
+      db.tasks.filter((t) => !t.deletedAt).toArray(),
+      db.entries.filter((e) => !e.deletedAt).toArray(),
+      db.goalUpdates.toArray(),
+      db.taskMoves.toArray(),
+    ]);
+    return { tasks, entries, updates, moves };
+  }, [db]);
 }

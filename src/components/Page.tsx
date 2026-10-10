@@ -1,12 +1,25 @@
 import type { ReactNode } from 'react';
+import { Art, type ArtMotion, type ArtName } from './art/Art';
 import { Icon, type IconName } from './Icon';
 
-export function PageHeader({ overline, title, children }: { overline?: string; title: string; children?: ReactNode }) {
+interface PageHeaderProps {
+  overline?: string;
+  title: string;
+  /** Color art beside the title; it moves when the header is hovered. */
+  art?: ArtName;
+  artMotion?: ArtMotion;
+  children?: ReactNode;
+}
+
+export function PageHeader({ overline, title, art, artMotion = 'bounce', children }: PageHeaderProps) {
   return (
     <header className="page-head">
-      <div>
-        {overline && <p className="overline">{overline}</p>}
-        <h1 className="page-head__title">{title}</h1>
+      <div className="page-head__title-row art-host">
+        {art && <Art name={art} size={44} motion={artMotion} />}
+        <div>
+          {overline && <p className="overline">{overline}</p>}
+          <h1 className="page-head__title">{title}</h1>
+        </div>
       </div>
       {children && <div className="page-head__actions">{children}</div>}
     </header>

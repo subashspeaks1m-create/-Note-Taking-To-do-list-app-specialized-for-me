@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Art } from '../../components/art/Art';
 import { Icon } from '../../components/Icon';
 import { formatLong, formatTimeInZone, type DateKey } from '../../date/localDate';
 import type { EntryKind, ID, JournalEntry, Task } from '../../domain/models';
@@ -36,9 +37,12 @@ export function JournalPane({
   return (
     <section className={`pane pane--journal ${expanded && active ? 'pane--expanded' : ''}`} aria-labelledby="journal-heading">
       <header className="pane__head">
-        <h2 id="journal-heading" className="pane__title">
-          What happened
-        </h2>
+        <div className="pane__title-row art-host">
+          <Art name="writing-hand" size={34} motion="wiggle" />
+          <h2 id="journal-heading" className="pane__title">
+            What happened
+          </h2>
+        </div>
         <span className="pane__meta tabular">{list.length === 0 ? 'No entries' : `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`}</span>
       </header>
 
