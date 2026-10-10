@@ -188,3 +188,57 @@ describe('journal', () => {
     expect(history[0]!.plainText).toBe('Typing 9');
   });
 });
+
+describe('plans and goals', () => {
+  it('edits a plan but refuses an end date before the start', async () => {
+    const decade = (await db.plans.toArray()).find((p) => p.kind === 'decade')!;
+    const next = await repo.updatePlan(decade.id, { statement: 'Become someone who ships every day.' });
+    expect(next.statement).toBe('Become someone who ships every day.');
+    await expect(repo.updatePlan(decade.id, { endDate: '2020-01-01' })).rejects.toThrow(/end date/);
+  });
+
+  it('creates a numeric goal and keeps every update as history', async () => {
+    const year = (await db.plans.toArray()).find((p) => p.kind === 'year')!;
+    const g = await repo.createGoal({ title: 'Make $1,000,000', planId: year.id, measurementMode: 'numeric', target: 1_000_000, current: 0, unit: '$' }, '2026-10-10');
+    await repo.logGoalValue(g.id, 25_000, 'First client', '2026-10-10');
+    clock = new Date('2026-10-11T04:30:00Z');
+    await repo.logGoalValue(g.id, 40_000, '', '2026-10-11');
+    expect((await db.goals.get(g.id))!.current).toBe(40_000);
+    const history = await db.goalUpdates.where('goalId').equals(g.id).sortBy('at');
+    expect(history.map((u) => [u.previous, u.value, u.dateKey])).toEqual([
+      [0, 25_000, '2026-10-10'],
+      [25_000, 40_000, '2026-10-11'],
+    ]);
+    await expect(repo.createGoal({ title: 'No target', planId: year.id, measurementMode: 'numeric' }, '2026-10-10')).rejects.toThrow(/target/);
+  });
+
+  it('blocks goal loops', async () => {
+    const a = await repo.createGoal({ title: 'A', planId: null, measurementMode: 'milestones' }, '2026-10-10');
+    const b = await repo.createGoal({ title: 'B', planId: null, parentId: a.id, measurementMode: 'milestones' }, '2026-10-10');
+    await expect(repo.updateGoal(a.id, { parentId: b.id })).rejects.toThrow(/own sub-goals/);
+  });
+
+  it('a habit creates a daily task linked to its goal', async () => {
+    const g = await repo.createGoal({ title: 'Get fit', planId: null, measurementMode: 'tasks' }, '2026-10-10');
+    const habit = await repo.addHabit({ goalId: g.id, title: '30 push-ups', category: 'doing', rule: { freq: 'daily', interval: 1 }, startDate: '2026-10-10' });
+    await repo.ensureOccurrences('2026-10-11', '2026-10-10');
+    const tasks = await db.tasks.where('goalIds').equals(g.id).sortBy('scheduledDate');
+    expect(tasks.map((t) => [t.scheduledDate, t.seriesId])).toEqual([
+      ['2026-10-10', habit.id],
+      ['2026-10-11', habit.id],
+    ]);
+    await repo.stopSeries(habit.id);
+    expect(await repo.ensureOccurrences('2026-10-12', '2026-10-10')).toBe(0);
+    await repo.resumeSeries(habit.id, '2026-10-12');
+    expect(await db.tasks.where('[seriesId+occurrenceDate]').equals([habit.id, '2026-10-12']).count()).toBe(1);
+  });
+
+  it('keeps old direction wordings when today\'s intention changes', async () => {
+    const base = { kind: 'day' as const, periodKey: '2026-10-10', startDate: '2026-10-10', endDate: '2026-10-10' };
+    await repo.saveDirection({ ...base, intention: 'Ship the habits screen' });
+    const next = await repo.saveDirection({ ...base, intention: 'Ship habits and the mind map' });
+    expect(next.version).toBe(2);
+    expect(next.history.map((h) => h.intention)).toEqual(['Ship the habits screen']);
+    expect(await db.periodDirections.count()).toBe(1);
+  });
+});

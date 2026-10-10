@@ -7,6 +7,8 @@ import { InsightsPage } from '../features/insights/InsightsPage';
 import { JournalPage } from '../features/journal/JournalPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { TodayPage } from '../features/today/TodayPage';
+import { GoalPage } from '../features/visions/GoalPage';
+import { PlanPage } from '../features/visions/PlanPage';
 import { VisionsPage } from '../features/visions/VisionsPage';
 import { StorageProvider } from '../storage/StorageProvider';
 import { AppShell } from './AppShell';
@@ -22,6 +24,8 @@ const routes: RouteObject[] = [
     children: [
       { index: true, element: <TodayPage /> },
       { path: 'visions', element: <VisionsPage /> },
+      { path: 'visions/:planId', element: <PlanPage /> },
+      { path: 'goals/:goalId', element: <GoalPage /> },
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'character', element: <CharacterPage /> },

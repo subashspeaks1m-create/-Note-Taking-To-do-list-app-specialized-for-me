@@ -25,8 +25,12 @@ export interface VisionPlan {
   title: string;
   startDate: DateKey;
   endDate: DateKey;
+  /** "Who I am becoming": the vision in the user's own words. */
+  statement: string;
   notes: string;
   successCriteria: string;
+  /** The latest written review of this plan. */
+  review: string;
   archivedAt: Instant | null;
   createdAt: Instant;
   updatedAt: Instant;
@@ -173,6 +177,9 @@ export interface CosmeticUnlock {
   ruleVersion: number;
 }
 
+export type MeasurementMode = 'manual' | 'milestones' | 'numeric' | 'tasks';
+export type GoalStatus = 'active' | 'achieved' | 'paused' | 'archived';
+
 export interface Goal {
   id: ID;
   planId: ID | null;
@@ -181,15 +188,38 @@ export interface Goal {
   title: string;
   why: string;
   category: Category | 'both';
-  measurementMode: 'manual' | 'milestones' | 'numeric' | 'tasks';
+  /** Life area such as Work, Health or Money. Free text; never invented for the user. */
+  domain: string;
+  measurementMode: MeasurementMode;
+  /** Numeric mode: the number to reach. */
   target: number | null;
+  /** Numeric mode: the latest value. Manual mode: percent 0-100. */
   current: number | null;
+  /** Numeric mode only, e.g. "$" or "km". */
   unit: string;
-  status: 'active' | 'achieved' | 'paused' | 'archived';
+  status: GoalStatus;
   reviewDate: DateKey | null;
   notes: string;
+  /** A real-life reward the user promises themselves; shown only once the goal is achieved. */
+  sealedReward: string;
+  achievedAt: Instant | null;
+  rank: number;
   createdAt: Instant;
   updatedAt: Instant;
+}
+
+/** One progress check-in. History is append-only so old charts are never rewritten. */
+export interface GoalUpdate {
+  id: ID;
+  goalId: ID;
+  /** Local day the update counts for (drives the goal streak). */
+  dateKey: DateKey;
+  at: Instant;
+  kind: 'value' | 'milestone' | 'note' | 'status';
+  /** Value after the update (numeric current or manual percent). */
+  value: number | null;
+  previous: number | null;
+  note: string;
 }
 
 export interface Milestone {
@@ -213,6 +243,8 @@ export interface PeriodDirection {
   review: string;
   updatedAt: Instant;
   version: number;
+  /** Earlier wordings, newest last; bounded. */
+  history: { at: Instant; intention: string; desiredOutcome: string; review: string }[];
 }
 
 /** Small singleton records live in one key-value table. */

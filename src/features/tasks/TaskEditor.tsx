@@ -3,8 +3,10 @@ import { useState } from 'react';
 import { Dialog } from '../../components/Dialog';
 import { dayOfWeek, formatMedium, isDateKey, parseKey, type DateKey } from '../../date/localDate';
 import { TASK_TITLE_MAX, type Category, type Effort } from '../../domain/config';
-import type { Priority, RecurrenceRule, Task, TaskStatus } from '../../domain/models';
+import type { ID, Priority, RecurrenceRule, Task, TaskStatus } from '../../domain/models';
 import { describeRule } from '../../domain/recurrence';
+import { goalChain } from '../../domain/goals';
+import { withGoalDefaults } from '../../storage/queries';
 import { PRIORITY_LABEL } from '../../domain/tasks';
 import { useRepo, useStorage } from '../../storage/StorageProvider';
 import { requestPersistenceOnce } from '../../storage/persistence';
@@ -65,8 +67,11 @@ export function TaskEditor({ task, defaultDate, defaultCategory, initialTitle = 
   const [tags, setTags] = useState(task?.tags.join(', ') ?? '');
   const [repeat, setRepeat] = useState<RepeatChoice>('none');
   const [weekdays, setWeekdays] = useState<number[]>([dayOfWeek(defaultDate)]);
+  const [goalIds, setGoalIds] = useState<ID[]>(task?.goalIds ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const goalData = useLiveQuery(async () => ({ goals: (await db.goals.toArray()).map(withGoalDefaults), plans: await db.plans.toArray() }), [db]);
+  const linkable = (goalData?.goals ?? []).filter((g) => (g.status === 'active' || g.status === 'paused') || goalIds.includes(g.id));
 
   const series = useLiveQuery(async () => (task?.seriesId ? db.taskSeries.get(task.seriesId) : undefined), [db, task?.seriesId]);
   const moves = useLiveQuery(async () => (task ? repo.taskMoves(task.id) : []), [repo, task?.id]);
@@ -94,6 +99,7 @@ export function TaskEditor({ task, defaultDate, defaultCategory, initialTitle = 
         .split(',')
         .map((t) => t.trim())
         .filter(Boolean),
+      goalIds,
     };
     setBusy(true);
     try {
@@ -260,6 +266,52 @@ export function TaskEditor({ task, defaultDate, defaultCategory, initialTitle = 
               </div>
             )}
             {repeat !== 'none' && <span className="field__note">Each day gets its own task. A missed day stays on its date and doesn't pile up.</span>}
+          </div>
+        )}
+
+        {linkable.length > 0 && (
+          <div className="field field--full">
+            <span className="field__label" id="te-goals">
+              Moves these goals <span className="field__hint">optional</span>
+            </span>
+            <div className="goal-picks" role="group" aria-labelledby="te-goals">
+              {linkable.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  className="goal-pick"
+                  aria-pressed={goalIds.includes(g.id)}
+                  onClick={() => setGoalIds((ids) => (ids.includes(g.id) ? ids.filter((x) => x !== g.id) : [...ids, g.id]))}
+                >
+                  {g.title}
+                </button>
+              ))}
+            </div>
+            {goalIds.length > 0 && goalData && (
+              <ul className="goal-chain">
+                {goalIds.map((id) => {
+                  const chain = goalChain(goalData.goals, goalData.plans, id);
+                  if (!chain.goals.length) return null;
+                  return (
+                    <li key={id}>
+                      <span className="goal-chain__task">This task</span>
+                      {chain.goals.map((g) => (
+                        <span key={g.id}>
+                          <span aria-hidden="true"> → </span>
+                          {g.title}
+                        </span>
+                      ))}
+                      {chain.plan && (
+                        <span>
+                          <span aria-hidden="true"> → </span>
+                          <strong>{chain.plan.title}</strong>
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         )}
 

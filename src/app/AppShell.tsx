@@ -6,7 +6,7 @@ import { APP_NAME } from '../domain/config';
 import { useDisplayPrefs } from './displayPrefs';
 
 /** Which build stage this preview shows; the note reappears for each new stage. */
-const PREVIEW_STAGE = 2;
+const PREVIEW_STAGE = 3;
 
 interface Destination {
   to: string;
@@ -50,7 +50,7 @@ export function AppShell() {
         {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
             <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
-            <span>Tasks and logs now save on this device. Goals arrive in stage 3; XP and suits in stage 5.</span>
+            <span>Visions, goals, daily habits and the mind map are live. Streaks and reports come next in stage 4; XP and suits in stage 5.</span>
             <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>
