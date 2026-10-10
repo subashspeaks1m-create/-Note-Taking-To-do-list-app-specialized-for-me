@@ -1,0 +1,118 @@
+/*
+ * Design tokens. Base palette comes from the build kit (assets/design-tokens.css);
+ * derived tints are computed here so every surface stays on one system.
+ * System fonts only: the daily tool never waits on the network to render text.
+ */
+:root {
+  color-scheme: dark;
+
+  /* Palette */
+  --canvas: #090d13;
+  --canvas-deep: #06090e;
+  --surface: #111923;
+  --raised: #192331;
+  --raised-2: #1f2b3b;
+  --border: #334355;
+  --border-quiet: #232f3e;
+  --text: #f4f1e8;
+  --muted: #b6c3d1;
+  --faint: #8a99aa;
+  --gold: #e8c477;
+  --learning: #79deec;
+  --doing: #ffa38e;
+  --focus: #bdacff;
+  --success: #a0d8b2;
+  --error: #ffb4be;
+  --warning: #f2d38a;
+
+  --gold-soft: rgb(232 196 119 / 0.14);
+  --gold-line: rgb(232 196 119 / 0.38);
+  --learning-soft: rgb(121 222 236 / 0.12);
+  --learning-line: rgb(121 222 236 / 0.4);
+  --doing-soft: rgb(255 163 142 / 0.12);
+  --doing-line: rgb(255 163 142 / 0.4);
+  --focus-soft: rgb(189 172 255 / 0.14);
+  --error-soft: rgb(255 180 190 / 0.12);
+  --hover: rgb(244 241 232 / 0.05);
+  --pressed: rgb(244 241 232 / 0.09);
+
+  /* Type */
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-display: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-read: Charter, 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Noto Serif', serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-3xl: 36px;
+  --text-journal: 18px;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --page-pad: 28px;
+  --gutter: 24px;
+  --row-pad-y: 12px;
+
+  /* Shape and depth */
+  --radius-panel: 18px;
+  --radius-card: 14px;
+  --radius-row: 10px;
+  --radius-pill: 999px;
+  --shadow-panel: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 16px 48px rgb(0 0 0 / 0.22);
+  --shadow-pop: 0 18px 60px rgb(0 0 0 / 0.5);
+
+  /* Motion */
+  --ease-ui: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-press: 120ms;
+  --dur-select: 180ms;
+  --dur-panel: 240ms;
+
+  /* Layout */
+  --rail-w: 84px;
+  --direction-w: 232px;
+  --bottom-bar-h: 64px;
+}
+
+:root[data-density='compact'] {
+  --page-pad: 20px;
+  --gutter: 16px;
+  --row-pad-y: 8px;
+  --text-journal: 17px;
+}
+
+@media (max-width: 899px) {
+  :root {
+    --page-pad: 16px;
+    --gutter: 16px;
+    --text-journal: 17px;
+  }
+}
+
+:root[data-motion='reduced'] {
+  --dur-press: 0ms;
+  --dur-select: 0ms;
+  --dur-panel: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion='full']) {
+    --dur-press: 0ms;
+    --dur-select: 0ms;
+    --dur-panel: 0ms;
+  }
+}

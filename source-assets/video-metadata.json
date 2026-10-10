@@ -1,0 +1,14 @@
+{
+  "durationSeconds" : 5.125,
+  "tracks" : [
+    {
+      "format" : [
+        "<CMVideoFormatDescription 0xc141691d0 [0x1f9dc0880]> {\n\tmediaType:'vide' \n\tmediaSubType:'avc1' \n\tmediaSpecific: {\n\t\tcodecType: 'avc1'\t\tdimensions: 1280 x 1002 \n\t} \n\textensions: {{\n    CVFieldCount = 1;\n    CVImageBufferChromaLocationBottomField = Left;\n    CVImageBufferChromaLocationTopField = Left;\n    CVImageBufferColorPrimaries = \"ITU_R_709_2\";\n    CVImageBufferTransferFunction = \"IEC_sRGB\";\n    CVImageBufferYCbCrMatrix = \"ITU_R_709_2\";\n    Depth = 24;\n    FormatName = Mediabunny;\n    FullRangeVideo = 1;\n    RevisionLevel = 0;\n    SampleDescriptionExtensionAtoms =     {\n        avcC = {length = 30, bytes = 0x01640020 ffe1000b 27640020 ac568050 ... 28ee3cb0 fdf8f800 };\n        btrt = {length = 12, bytes = 0x0000000000273f6000206427};\n    };\n    SpatialQuality = 0;\n    TemporalQuality = 0;\n    VerbatimISOSampleEntry = {length = 163, bytes = 0x000000a3 61766331 00000000 00000001 ... 00273f60 00206427 };\n    Version = 0;\n}}\n}"
+      ],
+      "fps" : 24,
+      "height" : 1002,
+      "mediaType" : "vide",
+      "width" : 1280
+    }
+  ]
+}
