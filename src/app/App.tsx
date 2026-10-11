@@ -1,6 +1,10 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, createMemoryRouter, RouterProvider, type RouteObject } from 'react-router-dom';
 import { ToastProvider } from '../components/Toasts';
 import { ClockProvider } from '../date/clock';
+
+// Offline support is off in the review preview, which runs inside another page.
+const PwaUpdater = import.meta.env.VITE_ROUTER === 'memory' ? null : lazy(() => import('./pwa').then((m) => ({ default: m.PwaUpdater })));
 import { CalendarPage } from '../features/calendar/CalendarPage';
 import { CharacterPage } from '../features/character/CharacterPage';
 import { InsightsPage } from '../features/insights/InsightsPage';
@@ -53,6 +57,11 @@ export function App() {
         <StorageProvider>
           <ToastProvider>
             <RouterProvider router={router} />
+            {PwaUpdater && (
+              <Suspense fallback={null}>
+                <PwaUpdater />
+              </Suspense>
+            )}
           </ToastProvider>
         </StorageProvider>
       </DisplayPrefsProvider>
