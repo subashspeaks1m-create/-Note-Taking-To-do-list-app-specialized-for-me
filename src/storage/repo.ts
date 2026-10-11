@@ -25,6 +25,14 @@ export class ConflictError extends Error {
   }
 }
 
+/** Thrown when a task or goal was changed elsewhere (another tab or window) while an edit form was open. */
+export class StaleEditError extends Error {
+  constructor(what: 'task' | 'goal') {
+    super(`This ${what} was changed in another tab or window while you were editing.`);
+    this.name = 'StaleEditError';
+  }
+}
+
 export interface NewTaskInput {
   title: string;
   category: Category;
@@ -304,9 +312,11 @@ export class Repository {
     return task;
   }
 
-  async updateTask(id: ID, patch: TaskPatch): Promise<Task> {
+  /** `baseRevision`, when given, is the revision the edit form started from; a newer stored revision is a conflict. */
+  async updateTask(id: ID, patch: TaskPatch, baseRevision?: number): Promise<Task> {
     return this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       const task = await this.mustGetTask(id);
+      if (baseRevision !== undefined && task.revision !== baseRevision) throw new StaleEditError('task');
       const next: Task = {
         ...task,
         ...patch,
@@ -772,11 +782,13 @@ export class Repository {
     });
   }
 
-  async updateGoal(id: ID, patch: Partial<GoalInput>): Promise<Goal> {
+  /** `baseUpdatedAt`, when given, is the goal's updatedAt when the edit form opened; anything newer is a conflict. */
+  async updateGoal(id: ID, patch: Partial<GoalInput>, baseUpdatedAt?: string): Promise<Goal> {
     return this.db.transaction('rw', this.db.goals, async () => {
       const all = await this.db.goals.toArray();
       const goal = all.find((g) => g.id === id);
       if (!goal) throw new ValidationError('That goal no longer exists.');
+      if (baseUpdatedAt !== undefined && goal.updatedAt !== baseUpdatedAt) throw new StaleEditError('goal');
       const mode = patch.measurementMode ?? goal.measurementMode;
       const next: Goal = {
         ...goal,

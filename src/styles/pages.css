@@ -881,3 +881,15 @@
   display: grid;
   gap: 14px;
 }
+
+/* Two-tab conflict notice in edit forms */
+.stale {
+  margin-top: var(--space-3, 12px);
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--warning, #e8b04a) 55%, transparent);
+  background: color-mix(in srgb, var(--warning, #e8b04a) 12%, transparent);
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+.stale p { margin: 0 0 10px; }
+.stale__actions { display: flex; flex-wrap: wrap; gap: 8px; }

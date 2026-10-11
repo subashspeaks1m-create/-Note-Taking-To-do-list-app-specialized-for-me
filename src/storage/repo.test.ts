@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppDatabase } from './db';
-import { ConflictError, Repository, type EntryContent } from './repo';
+import { ConflictError, Repository, StaleEditError, type EntryContent } from './repo';
 
 const TZ = 'Asia/Kolkata';
 let db: AppDatabase;
@@ -123,6 +123,25 @@ describe('tasks', () => {
     await repo.updateTask(second!.id, { title: 'Practice scales' });
     expect((await db.tasks.get(first!.id))!.title).toBe('Practice');
     expect((await db.tasks.get(first!.id))!.status).toBe('completed');
+  });
+});
+
+describe('two open tabs', () => {
+  it('refuses a task edit based on an older revision, then allows an explicit overwrite', async () => {
+    const t = await repo.addTask({ title: 'Plan the week', category: 'doing', scheduledDate: '2026-10-10' });
+    await repo.updateTask(t.id, { title: 'Plan the week (tab B)' }, t.revision);
+    await expect(repo.updateTask(t.id, { title: 'Plan the week (tab A)' }, t.revision)).rejects.toBeInstanceOf(StaleEditError);
+    expect((await db.tasks.get(t.id))!.title).toBe('Plan the week (tab B)');
+    await repo.updateTask(t.id, { title: 'Plan the week (tab A)' });
+    expect((await db.tasks.get(t.id))!.title).toBe('Plan the week (tab A)');
+  });
+
+  it('refuses a goal edit when the goal changed since the form opened', async () => {
+    const g = await repo.createGoal({ title: 'Read 12 books', planId: null, measurementMode: 'milestones' }, '2026-10-10');
+    clock = new Date(clock.getTime() + 60_000);
+    await repo.updateGoal(g.id, { title: 'Read 24 books' }, g.updatedAt);
+    await expect(repo.updateGoal(g.id, { title: 'Read 6 books' }, g.updatedAt)).rejects.toBeInstanceOf(StaleEditError);
+    expect((await db.goals.get(g.id))!.title).toBe('Read 24 books');
   });
 });
 

@@ -1,8 +1,10 @@
+import { StaleNotice } from '../../components/StaleNotice';
 import { useMemo, useState } from 'react';
 import { Dialog } from '../../components/Dialog';
 import { isDateKey, type DateKey } from '../../date/localDate';
 import { DOMAIN_SUGGESTIONS, MEASUREMENT_LABEL, PLAN_KIND_LABEL, descendantIds } from '../../domain/goals';
 import type { Goal, ID, MeasurementMode, VisionPlan } from '../../domain/models';
+import { StaleEditError } from '../../storage/repo';
 import { useRepo } from '../../storage/StorageProvider';
 
 interface Props {
@@ -58,6 +60,9 @@ export function GoalEditor({ goal, plans, goals, defaultPlanId, defaultParentId 
   }, [goals, goal]);
   const modeChanged = goal !== null && goal.measurementMode !== mode;
 
+  const [baseUpdatedAt, setBaseUpdatedAt] = useState(goal?.updatedAt);
+  const [stale, setStale] = useState(false);
+
   const save = async () => {
     setError(null);
     const t = parseNumber(target);
@@ -91,11 +96,12 @@ export function GoalEditor({ goal, plans, goals, defaultPlanId, defaultParentId 
     };
     setBusy(true);
     try {
-      const saved = goal ? await repo.updateGoal(goal.id, input) : await repo.createGoal(input, today);
+      const saved = goal ? await repo.updateGoal(goal.id, input, baseUpdatedAt) : await repo.createGoal(input, today);
       onSaved(saved, !goal);
       onClose();
     } catch (e) {
-      setError((e as Error).message || 'Could not save. Your changes are still here.');
+      if (e instanceof StaleEditError) setStale(true);
+      else setError((e as Error).message || 'Could not save. Your changes are still here.');
       setBusy(false);
     }
   };
@@ -258,6 +264,16 @@ export function GoalEditor({ goal, plans, goals, defaultPlanId, defaultParentId 
         <p className="form-error" role="alert">
           {error}
         </p>
+      )}
+      {stale && (
+        <StaleNotice
+          what="goal"
+          onKeepTheirs={onClose}
+          onKeepMine={() => {
+            setStale(false);
+            setBaseUpdatedAt(undefined);
+          }}
+        />
       )}
     </Dialog>
   );
