@@ -52,6 +52,7 @@ export function SettingsPage() {
         <Choice label="Motion" prefKey="motion" options={[{ value: 'system', label: 'Match device' }, { value: 'full', label: 'Full' }, { value: 'reduced', label: 'Reduced' }]} />
         <Choice label="Character playback" prefKey="avatarPlayback" options={[{ value: 'auto', label: 'Animated' }, { value: 'still', label: 'Still image' }]} />
         <Choice label="Graphics" prefKey="lowGraphics" options={[{ value: false, label: 'Full' }, { value: true, label: 'Low' }]} />
+        <Choice label="Sounds" prefKey="sound" options={[{ value: 'off', label: 'Off' }, { value: 'on', label: 'Soft chimes' }]} />
       </section>
 
       <section className="settings-group" aria-labelledby="sg-credits">

@@ -1,3 +1,4 @@
+import { UnlockWatcher } from '../features/character/UnlockReveal';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom';
 import { Art } from '../components/art/Art';
@@ -13,7 +14,7 @@ import { useProfile } from '../storage/StorageProvider';
 import { useDisplayPrefs } from './displayPrefs';
 
 /** Which build stage this preview shows; the note reappears for each new stage. */
-const PREVIEW_STAGE = 4;
+const PREVIEW_STAGE = 5;
 
 interface Destination {
   to: string;
@@ -27,6 +28,7 @@ export const DESTINATIONS: readonly Destination[] = [
   { to: '/visions', label: 'Visions', icon: 'vision', mobilePrimary: true },
   { to: '/calendar', label: 'Calendar', icon: 'calendar', mobilePrimary: true },
   { to: '/journal', label: 'Journal', icon: 'journal', mobilePrimary: true },
+  { to: '/principles', label: 'Principles', icon: 'principles', mobilePrimary: false },
   { to: '/character', label: 'Character', icon: 'character', mobilePrimary: false },
   { to: '/insights', label: 'Insights', icon: 'insights', mobilePrimary: false },
   { to: '/settings', label: 'Settings', icon: 'settings', mobilePrimary: false },
@@ -58,7 +60,7 @@ export function AppShell() {
         {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
             <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
-            <span>Calendar, journal search, streaks, "you vs past you" and weekly/monthly reports are live. XP, suits and transformations come in stage 5.</span>
+            <span>Stage 5: real XP and levels, badges, streak transformations, platforms and reward chests are live. Suit art and 360° clips arrive as you make them.</span>
             <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>
@@ -66,6 +68,7 @@ export function AppShell() {
         )}
         {!location.pathname.startsWith('/insights') && <ReportReady inbox={inbox} />}
         <Outlet />
+        <UnlockWatcher />
       </main>
       <BottomBar inbox={inbox} />
     </div>

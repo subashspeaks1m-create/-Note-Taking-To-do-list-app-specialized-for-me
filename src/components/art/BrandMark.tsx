@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { useReducedMotion } from './LiveIcon';
+import { useReducedMotion } from '../../app/displayPrefs';
 
 const ORBIT = 'M4 40a28 9 0 1 0 56 0a28 9 0 1 0 -56 0';
 const RAYS = [0, 45, 90, 135, 180, 225, 270, 315];

@@ -253,3 +253,171 @@ describe('plans and goals', () => {
     expect(again.history.at(-1)?.blockers).toBe('Too many meetings');
   });
 });
+
+describe('earnings and outfit', () => {
+  it('logs whole-dollar earnings, rejects bad amounts and soft-deletes', async () => {
+    const e = await repo.addEarning({ dateKey: '2026-10-10', amount: 2500.4, note: '  First client  ' });
+    expect(e).toMatchObject({ amount: 2500, note: 'First client', deletedAt: null });
+    await expect(repo.addEarning({ dateKey: '2026-10-10', amount: 0 })).rejects.toThrow();
+    await expect(repo.addEarning({ dateKey: '2026-10-10', amount: Number.NaN })).rejects.toThrow();
+    await repo.deleteEarning(e.id);
+    expect((await db.earnings.get(e.id))?.deletedAt).toBeTruthy();
+    await repo.restoreEarning(e.id);
+    expect((await db.earnings.get(e.id))?.deletedAt).toBeNull();
+  });
+
+  it('remembers the equipped look', async () => {
+    await repo.setOutfit('symbiote');
+    expect((await db.kv.get('outfit'))?.value).toBe('symbiote');
+  });
+});
+
+describe('principles', () => {
+  it('keeps an ordered list where the first is the topmost', async () => {
+    const a = await repo.addPrinciple({ text: '  Never   miss twice ' });
+    const b = await repo.addPrinciple({ text: 'Do the hard thing first', top: true });
+    const c = await repo.addPrinciple({ text: 'Tell the truth' });
+    expect(a.text).toBe('Never miss twice');
+    expect((await repo.listPrinciples()).map((p) => p.id)).toEqual([b.id, a.id, c.id]);
+    await repo.movePrinciple(c.id, 0);
+    expect((await repo.listPrinciples())[0]!.id).toBe(c.id);
+    await expect(repo.addPrinciple({ text: '   ' })).rejects.toThrow();
+  });
+
+  it('edits, deletes and restores a principle in place', async () => {
+    const a = await repo.addPrinciple({ text: 'One' });
+    const b = await repo.addPrinciple({ text: 'Two' });
+    await repo.addPrinciple({ text: 'Three' });
+    await repo.updatePrinciple(b.id, { text: 'Two, edited', why: 'Because' });
+    const removed = await repo.deletePrinciple(b.id);
+    expect(removed?.index).toBe(1);
+    expect((await repo.listPrinciples()).map((p) => p.text)).toEqual(['One', 'Three']);
+    await repo.restorePrinciple(removed!.principle, removed!.index);
+    expect((await repo.listPrinciples()).map((p) => p.text)).toEqual(['One', 'Two, edited', 'Three']);
+    expect((await repo.listPrinciples())[1]!.why).toBe('Because');
+    expect(a.id).toBeTruthy();
+  });
+});
+
+describe('XP ledger', () => {
+  const totals = async () => {
+    const { xpTotals } = await import('../domain/ledger');
+    return xpTotals(await db.xpEvents.toArray());
+  };
+
+  it('awards completion XP once; reopen reverses and re-complete restores without farming', async () => {
+    const t = await repo.addTask({ title: 'Ship it', category: 'doing', scheduledDate: '2026-10-10', effort: 'standard' });
+    const first = await repo.setTaskStatus(t.id, 'completed', TZ);
+    expect(first.xp).toBe(20);
+    expect((await totals()).doing).toBe(20);
+    for (let i = 0; i < 3; i++) {
+      await repo.setTaskStatus(t.id, 'todo', TZ);
+      expect((await totals()).global).toBe(0);
+      await repo.setTaskStatus(t.id, 'completed', TZ);
+    }
+    expect((await totals()).doing).toBe(20);
+    // Every change is an appended event; nothing old is edited.
+    expect(await db.xpEvents.count()).toBe(7);
+    const keys = (await db.xpEvents.toArray()).map((e) => e.eventKey);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('changing effort after completion cannot raise the reward', async () => {
+    const t = await repo.addTask({ title: 'Small thing', category: 'learning', scheduledDate: '2026-10-10', effort: 'small' });
+    await repo.setTaskStatus(t.id, 'completed', TZ);
+    await repo.updateTask(t.id, { effort: 'deep' });
+    await repo.setTaskStatus(t.id, 'todo', TZ);
+    await repo.setTaskStatus(t.id, 'completed', TZ);
+    expect((await totals()).learning).toBe(10);
+  });
+
+  it('caps completion XP at 200 per track per day and refills from the next task when one is reversed', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const t = await repo.addTask({ title: `Deep ${i}`, category: 'doing', scheduledDate: '2026-10-10', effort: 'deep' });
+      ids.push(t.id);
+      clock = new Date(clock.getTime() + 60_000);
+      await repo.setTaskStatus(t.id, 'completed', TZ);
+    }
+    expect((await totals()).doing).toBe(200); // 7 × 35 = 245, capped
+    const last = await db.xpEvents.where('sourceId').equals(ids[6]!).toArray();
+    expect(last.reduce((s, e) => s + e.delta, 0)).toBe(0);
+    const capped = await repo.setTaskStatus(ids[6]!, 'todo', TZ).then(() => repo.setTaskStatus(ids[6]!, 'completed', TZ));
+    expect(capped.capped).toBe(true);
+    await repo.deleteTasks([ids[0]!]);
+    expect((await totals()).doing).toBe(200); // the 7th task now gets its XP
+    await repo.restoreTasks([ids[0]!]);
+    expect((await totals()).doing).toBe(200);
+  });
+
+  it('pays one documentation bonus per completed task and withdraws it when the entry is deleted', async () => {
+    const t = await repo.addTask({ title: 'Read', category: 'learning', scheduledDate: '2026-10-10', effort: 'small' });
+    await repo.setTaskStatus(t.id, 'completed', TZ);
+    const a = await repo.createEntry({ dateKey: '2026-10-10', kind: 'learning', taskIds: [t.id], timeZone: TZ });
+    const b = await repo.createEntry({ dateKey: '2026-10-10', kind: 'learning', taskIds: [t.id], timeZone: TZ });
+    await repo.saveEntry(a.id, content('Learned a lot', { taskIds: [t.id] }), 1);
+    await repo.saveEntry(b.id, content('And more', { taskIds: [t.id] }), 1);
+    await repo.setDocumented(a.id, true);
+    await repo.setDocumented(b.id, true);
+    expect((await totals()).learning).toBe(15);
+    await repo.deleteEntry(a.id);
+    expect((await totals()).learning).toBe(15); // b still documents it
+    await repo.deleteEntry(b.id);
+    expect((await totals()).learning).toBe(10);
+  });
+
+  it('pays a documented reflection once per day, globally', async () => {
+    for (let i = 0; i < 2; i++) {
+      const e = await repo.createEntry({ dateKey: '2026-10-10', kind: 'reflection', timeZone: TZ });
+      await repo.saveEntry(e.id, content('A thought', { kind: 'reflection' }), 1);
+      await repo.setDocumented(e.id, true);
+    }
+    const t = await totals();
+    expect([t.global, t.learning, t.doing]).toEqual([5, 0, 0]);
+  });
+
+  it('reclassifying a completed task moves its XP between tracks without adding any', async () => {
+    const t = await repo.addTask({ title: 'Course', category: 'learning', scheduledDate: '2026-10-10', effort: 'standard' });
+    await repo.setTaskStatus(t.id, 'completed', TZ);
+    await repo.updateTask(t.id, { category: 'doing' });
+    const now = await totals();
+    expect([now.global, now.learning, now.doing]).toEqual([20, 0, 20]);
+  });
+
+  it('repairLedger backfills completions made before the ledger existed, once', async () => {
+    const t = await repo.addTask({ title: 'Old', category: 'doing', scheduledDate: '2026-10-10' });
+    await repo.setTaskStatus(t.id, 'completed', TZ);
+    await db.xpEvents.clear();
+    expect(await repo.repairLedger()).toBe(1);
+    expect(await repo.repairLedger()).toBe(0);
+    expect((await totals()).doing).toBe(20);
+  });
+});
+
+describe('unlocks and chests', () => {
+  it('records each badge and cosmetic once, permanently', async () => {
+    const first = await repo.recordUnlocks(new Map([['first-step', ['t1']]]), ['look:web-runner']);
+    expect(first).toEqual(['badge:first-step', 'look:web-runner']);
+    expect(await repo.recordUnlocks(new Map([['first-step', ['t1']]]), ['look:web-runner'])).toEqual([]);
+    expect(await db.achievements.count()).toBe(1);
+  });
+
+  it('opens an achieved goal chest once and always shows the same prize', async () => {
+    const sprint = (await db.plans.toArray()).find((p) => p.kind === 'sprint')!;
+    const goal = await repo.createGoal({ title: 'Ship v1', planId: sprint.id, category: 'doing', measurementMode: 'manual', sealedReward: 'New headphones' }, '2026-10-10');
+    await expect(repo.openChest(goal.id)).rejects.toThrow(/achieved/);
+    await repo.setGoalStatus(goal.id, 'achieved', '2026-10-10');
+    const prize = await repo.openChest(goal.id);
+    expect(prize.chest).toBe(true);
+    expect((await repo.openChest(goal.id)).id).toBe(prize.id);
+    await repo.setPlatform(prize.id);
+    await expect(repo.setPlatform('void-gate' === prize.id ? 'sunforge' : 'void-gate')).rejects.toThrow(/Unlock/);
+  });
+
+  it('Finish Strong can only be marked from the sprint last day', async () => {
+    const sprint = (await db.plans.toArray()).find((p) => p.kind === 'sprint')!;
+    await expect(repo.setSprintFinished(sprint.id, true, '2026-12-30')).rejects.toThrow(/last day/);
+    await repo.setSprintFinished(sprint.id, true, '2026-12-31');
+    expect((await db.plans.get(sprint.id))!.finishedAt).toBeTruthy();
+  });
+});

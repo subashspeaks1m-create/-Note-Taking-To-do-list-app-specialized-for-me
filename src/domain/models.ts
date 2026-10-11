@@ -31,6 +31,8 @@ export interface VisionPlan {
   successCriteria: string;
   /** The latest written review of this plan. */
   review: string;
+  /** Sprint only: set when the user explicitly marks it finished strong (on or after its last day). */
+  finishedAt?: Instant | null;
   archivedAt: Instant | null;
   createdAt: Instant;
   updatedAt: Instant;
@@ -175,6 +177,8 @@ export interface CosmeticUnlock {
   cosmeticId: string;
   unlockedAt: Instant;
   ruleVersion: number;
+  /** For an opened reward chest: the cosmetic found inside, e.g. `stage:nebula`. */
+  contents?: string;
 }
 
 export type MeasurementMode = 'manual' | 'milestones' | 'numeric' | 'tasks';
@@ -252,6 +256,29 @@ export interface PeriodDirection {
 }
 
 /** Small singleton records live in one key-value table. */
+/** A rule Prem lives by. The first in the list is the topmost principle. */
+export interface Principle {
+  id: ID;
+  text: string;
+  /** Optional: why it matters, or the story behind it. */
+  why: string;
+  createdAt: Instant;
+  updatedAt: Instant;
+}
+
+/** Money earned, logged by hand. Lifetime total drives the character's rank form. */
+export interface EarningEntry {
+  id: ID;
+  /** Local day the money came in. */
+  dateKey: DateKey;
+  /** Whole US dollars. */
+  amount: number;
+  note: string;
+  createdAt: Instant;
+  updatedAt: Instant;
+  deletedAt: Instant | null;
+}
+
 export interface KeyValue {
   key: string;
   value: unknown;

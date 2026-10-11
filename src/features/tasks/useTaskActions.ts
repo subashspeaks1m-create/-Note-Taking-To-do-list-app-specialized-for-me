@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useToast } from '../../components/Toasts';
 import { formatShort, type DateKey } from '../../date/localDate';
+import { XP_RULES } from '../../domain/config';
 import type { ID, Task, TaskMove, TaskStatus } from '../../domain/models';
 import { useRepo } from '../../storage/StorageProvider';
 
@@ -14,7 +15,15 @@ export function useTaskActions(timeZone: string) {
   const setStatus = useCallback(
     async (task: Task, status: TaskStatus): Promise<Task | null> => {
       try {
-        const { after } = await repo.setTaskStatus(task.id, status, timeZone);
+        const { after, capped, xp } = await repo.setTaskStatus(task.id, status, timeZone);
+        if (capped) {
+          const track = after.category === 'learning' ? 'Learning' : 'Doing';
+          toast({
+            message: xp > 0
+              ? `Done. Only ${xp} XP counted: today's ${track} limit is ${XP_RULES.completionDailyCapPerTrack} XP.`
+              : `Done and recorded. Today's ${track} XP limit (${XP_RULES.completionDailyCapPerTrack}) is reached, so this one adds no XP.`,
+          });
+        }
         if (status === 'canceled') {
           toast({ message: 'Task canceled', action: { label: 'Undo', run: () => void repo.setTaskStatus(task.id, task.status, timeZone) } });
         }

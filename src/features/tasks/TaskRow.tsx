@@ -3,6 +3,8 @@ import { Icon } from '../../components/Icon';
 import { Menu, type MenuItem } from '../../components/Menu';
 import { formatShort } from '../../date/localDate';
 import type { Task } from '../../domain/models';
+import { useSound } from '../../app/sound';
+import { XP_RULES } from '../../domain/config';
 import { PRIORITY_LABEL } from '../../domain/tasks';
 
 export interface TaskRowHandlers {
@@ -44,6 +46,7 @@ export const TaskRow = memo(function TaskRow({
   const moved = task.originalScheduledDate && task.scheduledDate && task.originalScheduledDate !== task.scheduledDate;
   // Bumped when the user checks the task off, to play one celebration burst.
   const [burst, setBurst] = useState(0);
+  const sound = useSound();
 
   return (
     <li
@@ -76,7 +79,10 @@ export const TaskRow = memo(function TaskRow({
             checked={done}
             disabled={canceled}
             onChange={() => {
-              if (!done) setBurst((n) => n + 1);
+              if (!done) {
+                setBurst((n) => n + 1);
+                sound('complete');
+              }
               onToggle(task);
             }}
             aria-label={`${done ? 'Mark not done' : 'Complete'}: ${task.title}`}
@@ -84,7 +90,7 @@ export const TaskRow = memo(function TaskRow({
           <span key={`box-${burst}`} className={`task__box ${burst > 0 && done ? 'task__box--pop' : ''}`} aria-hidden="true">
             {done && <Icon name="check" size={14} />}
           </span>
-          {burst > 0 && done && <Burst key={`burst-${burst}`} tone={task.category} />}
+          {burst > 0 && done && <Burst key={`burst-${burst}`} tone={task.category} xp={task.award?.nominalXp ?? XP_RULES.completionByEffort[task.effort]} />}
         </label>
       )}
 
@@ -131,8 +137,8 @@ export const TaskRow = memo(function TaskRow({
 
 const BITS = Array.from({ length: 10 }, (_, i) => i);
 
-/** Confetti, a ring and "+1" thrown from the checkbox when a task is finished. */
-function Burst({ tone }: { tone: Task['category'] }) {
+/** Confetti, a ring and the task's XP thrown from the checkbox when it is finished. */
+function Burst({ tone, xp }: { tone: Task['category']; xp: number }) {
   const colors = tone === 'learning' ? ['var(--learning)', 'var(--gold)', '#fff'] : ['var(--doing)', 'var(--gold)', '#fff'];
   return (
     <span className="burst" aria-hidden="true">
@@ -140,7 +146,7 @@ function Burst({ tone }: { tone: Task['category'] }) {
       {BITS.map((i) => (
         <span key={i} className="burst__bit" style={{ '--a': `${i * 36 + (i % 2) * 12}deg`, '--c': colors[i % 3] } as CSSProperties} />
       ))}
-      <span className="burst__plus">+1</span>
+      <span className="burst__plus">+{xp} XP</span>
     </span>
   );
 }

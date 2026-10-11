@@ -2,13 +2,16 @@ import type { JSONContent } from '@tiptap/core';
 import { dateKeyInZone, type DateKey } from '../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, RULES_VERSION, type Category, type Effort } from '../domain/config';
 import type {
-  EntryKind, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
-  Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan,
+  EarningEntry, EntryKind, Principle, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
+  Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan, XPEvent,
 } from '../domain/models';
 import { wouldCreateCycle } from '../domain/goals';
 import { RECURRENCE_HORIZON_DAYS, seriesOccursOn } from '../domain/recurrence';
 import { normalizeTitle, rankBetween, ValidationError, withStatus } from '../domain/tasks';
 import { addDays, compareKeys } from '../date/localDate';
+import { desiredAwards, reconcile } from '../domain/ledger';
+import { chestPlatform, cosmeticId, platformById, type Platform } from '../domain/unlocks';
+import type { BadgeId } from '../domain/config';
 import { SCHEMA_VERSION, type AppDatabase } from './db';
 
 export const uuid = (): ID => crypto.randomUUID();
@@ -75,7 +78,7 @@ export const MAX_REVISIONS_PER_ENTRY = 40;
 /** Autosaves closer together than this update the newest checkpoint instead of adding one. */
 export const CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000;
 
-const KV = { profile: 'profile', meta: 'meta' } as const;
+const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', platform: 'platform', principles: 'principles' } as const;
 
 /**
  * Typed storage operations. Components call these instead of touching
@@ -129,6 +132,34 @@ export class Repository {
       ]);
       await this.db.plans.bulkAdd(plans);
     });
+  }
+
+  // ---------- XP ledger ----------
+
+  /**
+   * Appends whatever compensating events make the ledger match the source
+   * records. Always runs inside the caller's transaction, which must include
+   * tasks, entries and xpEvents.
+   */
+  private async syncLedger(): Promise<XPEvent[]> {
+    const [tasks, entries, events] = await Promise.all([
+      this.db.tasks.filter((t) => !!t.award).toArray(),
+      this.db.entries.filter((e) => !!e.documentedAt).toArray(),
+      this.db.xpEvents.toArray(),
+    ]);
+    const added = reconcile(desiredAwards(tasks, entries), events, uuid, this.iso());
+    if (added.length) await this.db.xpEvents.bulkAdd(added);
+    return added;
+  }
+
+  private async heldXp(sourceType: XPEvent['sourceType'], sourceId: string): Promise<number> {
+    const events = await this.db.xpEvents.where('sourceId').equals(sourceId).toArray();
+    return events.filter((e) => e.sourceType === sourceType).reduce((sum, e) => sum + e.delta, 0);
+  }
+
+  /** Brings the ledger up to date with the records (on startup, so data from before stage 5 earns its XP). */
+  async repairLedger(): Promise<number> {
+    return this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => (await this.syncLedger()).length);
   }
 
   async getProfile(): Promise<Profile> {
@@ -209,7 +240,7 @@ export class Repository {
   }
 
   async updateTask(id: ID, patch: TaskPatch): Promise<Task> {
-    return this.db.transaction('rw', this.db.tasks, async () => {
+    return this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       const task = await this.mustGetTask(id);
       const next: Task = {
         ...task,
@@ -219,36 +250,50 @@ export class Repository {
         revision: task.revision + 1,
       };
       await this.db.tasks.put(next);
+      // Reclassifying a completed task moves its frozen award between tracks.
+      if (next.award && next.category !== task.category) await this.syncLedger();
       return next;
     });
   }
 
-  async setTaskStatus(id: ID, status: TaskStatus, timeZone: string): Promise<{ before: Task; after: Task }> {
-    return this.db.transaction('rw', this.db.tasks, async () => {
+  /**
+   * Changes status and settles the XP ledger in the same transaction. `xp` is
+   * the net change for this task's completion; `capped` means the task was
+   * recorded but today's track cap held back some or all of its reward.
+   */
+  async setTaskStatus(id: ID, status: TaskStatus, timeZone: string): Promise<{ before: Task; after: Task; xp: number; capped: boolean }> {
+    return this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       const before = await this.mustGetTask(id);
       const after = withStatus(before, status, this.now(), timeZone);
       if (after !== before) await this.db.tasks.put(after);
-      return { before, after };
+      const added = await this.syncLedger();
+      const xp = added.filter((e) => e.sourceId === id && e.sourceType === 'task-completion').reduce((sum, e) => sum + e.delta, 0);
+      const held = await this.heldXp('task-completion', id);
+      const capped = status === 'completed' && before.status !== 'completed' && !!after.award && held < after.award.nominalXp;
+      return { before, after, xp, capped };
     });
   }
 
   /** Soft delete; `restoreTask` brings it back with its completion and award intact. */
   async deleteTasks(ids: ID[]): Promise<void> {
-    await this.db.transaction('rw', this.db.tasks, async () => {
+    await this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       const at = this.iso();
       for (const id of ids) {
         const task = await this.db.tasks.get(id);
         if (task && !task.deletedAt) await this.db.tasks.put({ ...task, deletedAt: at, updatedAt: at, revision: task.revision + 1 });
       }
+      await this.syncLedger();
     });
   }
 
   async restoreTasks(ids: ID[]): Promise<void> {
-    await this.db.transaction('rw', this.db.tasks, async () => {
+    await this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       for (const id of ids) {
         const task = await this.db.tasks.get(id);
         if (task?.deletedAt) await this.db.tasks.put({ ...task, deletedAt: null, updatedAt: this.iso(), revision: task.revision + 1 });
       }
+      // Undo restores the earlier allocation instead of awarding something new.
+      await this.syncLedger();
     });
   }
 
@@ -411,7 +456,7 @@ export class Repository {
    * Otherwise throws ConflictError and changes nothing, so neither version is lost.
    */
   async saveEntry(id: ID, content: EntryContent, baseRevision: number): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current) throw new ValidationError('This entry no longer exists.');
       if (current.revision !== baseRevision) throw new ConflictError(current);
@@ -426,6 +471,7 @@ export class Repository {
       };
       await this.db.entries.put(next);
       await this.checkpoint(next, 'checkpoint');
+      if (current.documentedAt && !next.documentedAt) await this.syncLedger();
       return next;
     });
   }
@@ -459,7 +505,7 @@ export class Repository {
 
   /** Overwrites with the local draft after a conflict, keeping the other version in history. */
   async saveEntryOverConflict(id: ID, content: EntryContent): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current) throw new ValidationError('This entry no longer exists.');
       await this.db.entryRevisions.add({
@@ -491,18 +537,19 @@ export class Repository {
   }
 
   async updateEntryMeta(id: ID, patch: Partial<Pick<JournalEntry, 'kind' | 'happenedAt' | 'taskIds' | 'tags' | 'pinned' | 'title'>>): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current) throw new ValidationError('This entry no longer exists.');
       const next = { ...current, ...patch, updatedAt: this.iso(), revision: current.revision + 1 };
       await this.db.entries.put(next);
+      if (current.documentedAt && (patch.taskIds || patch.kind)) await this.syncLedger();
       return next;
     });
   }
 
   /** Documented requires an explicit choice and nonblank text. */
   async setDocumented(id: ID, documented: boolean): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current) throw new ValidationError('This entry no longer exists.');
       if (documented && !current.plainText.trim()) throw new ValidationError('Write something before marking this entry documented.');
@@ -513,23 +560,26 @@ export class Repository {
         revision: current.revision + 1,
       };
       await this.db.entries.put(next);
+      await this.syncLedger();
       return next;
     });
   }
 
   async deleteEntry(id: ID): Promise<void> {
-    await this.db.transaction('rw', this.db.entries, this.db.entryRevisions, async () => {
+    await this.db.transaction('rw', this.db.entries, this.db.entryRevisions, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current || current.deletedAt) return;
       await this.checkpoint({ ...current, updatedAt: this.iso() }, 'before-delete');
       await this.db.entries.put({ ...current, deletedAt: this.iso(), updatedAt: this.iso(), revision: current.revision + 1 });
+      if (current.documentedAt) await this.syncLedger();
     });
   }
 
   async restoreEntry(id: ID): Promise<void> {
-    await this.db.transaction('rw', this.db.entries, async () => {
+    await this.db.transaction('rw', this.db.entries, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (current?.deletedAt) await this.db.entries.put({ ...current, deletedAt: null, updatedAt: this.iso(), revision: current.revision + 1 });
+      if (current?.documentedAt) await this.syncLedger();
     });
   }
 
@@ -548,7 +598,7 @@ export class Repository {
   }
 
   async restoreRevision(entryId: ID, revisionId: ID): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(entryId);
       const rev = await this.db.entryRevisions.get(revisionId);
       if (!current || !rev) throw new ValidationError('That version is no longer available.');
@@ -565,6 +615,7 @@ export class Repository {
         revision: current.revision + 1,
       };
       await this.db.entries.put(next);
+      if (current.documentedAt) await this.syncLedger();
       return next;
     });
   }
@@ -757,6 +808,163 @@ export class Repository {
 
   async renameSeries(id: ID, title: string): Promise<void> {
     await this.db.taskSeries.update(id, { title: normalizeTitle(title), updatedAt: this.iso() });
+  }
+
+  // ---------- Principles ----------
+
+  async listPrinciples(): Promise<Principle[]> {
+    return ((await this.db.kv.get(KV.principles))?.value as Principle[] | undefined) ?? [];
+  }
+
+  /** Runs a change on the ordered list in one transaction, so two tabs can't interleave. */
+  private async changePrinciples(fn: (list: Principle[]) => Principle[]): Promise<Principle[]> {
+    return this.db.transaction('rw', this.db.kv, async () => {
+      const next = fn(await this.listPrinciples());
+      await this.db.kv.put({ key: KV.principles, value: next });
+      return next;
+    });
+  }
+
+  async addPrinciple(input: { text: string; why?: string; top?: boolean }): Promise<Principle> {
+    const text = input.text.trim().replace(/\s+/g, ' ');
+    if (!text) throw new ValidationError('Write the principle first.');
+    if (text.length > 280) throw new ValidationError('Keep a principle under 280 characters.');
+    const at = this.iso();
+    const created: Principle = { id: uuid(), text, why: (input.why ?? '').trim().slice(0, 2000), createdAt: at, updatedAt: at };
+    await this.changePrinciples((list) => (input.top ? [created, ...list] : [...list, created]));
+    return created;
+  }
+
+  async updatePrinciple(id: ID, patch: { text?: string; why?: string }): Promise<void> {
+    const text = patch.text?.trim().replace(/\s+/g, ' ');
+    if (text !== undefined && !text) throw new ValidationError('A principle cannot be empty.');
+    if (text && text.length > 280) throw new ValidationError('Keep a principle under 280 characters.');
+    await this.changePrinciples((list) =>
+      list.map((p) => (p.id === id ? { ...p, ...(text !== undefined ? { text } : {}), ...(patch.why !== undefined ? { why: patch.why.trim().slice(0, 2000) } : {}), updatedAt: this.iso() } : p)),
+    );
+  }
+
+  /** Moves a principle to a position; index 0 makes it the topmost. */
+  async movePrinciple(id: ID, toIndex: number): Promise<void> {
+    await this.changePrinciples((list) => {
+      const from = list.findIndex((p) => p.id === id);
+      if (from < 0) return list;
+      const next = [...list];
+      const [item] = next.splice(from, 1);
+      next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, item!);
+      return next;
+    });
+  }
+
+  /** Removes a principle and returns where it was, so Undo can put it back. */
+  async deletePrinciple(id: ID): Promise<{ principle: Principle; index: number } | null> {
+    let removed: { principle: Principle; index: number } | null = null;
+    await this.changePrinciples((list) => {
+      const index = list.findIndex((p) => p.id === id);
+      if (index < 0) return list;
+      removed = { principle: list[index]!, index };
+      return list.filter((p) => p.id !== id);
+    });
+    return removed;
+  }
+
+  async restorePrinciple(principle: Principle, index: number): Promise<void> {
+    await this.changePrinciples((list) => {
+      if (list.some((p) => p.id === principle.id)) return list;
+      const next = [...list];
+      next.splice(Math.min(index, next.length), 0, principle);
+      return next;
+    });
+  }
+
+  // ---------- Earnings and outfit ----------
+
+  async addEarning(input: { dateKey: DateKey; amount: number; note?: string }): Promise<EarningEntry> {
+    const amount = Math.round(input.amount);
+    if (!Number.isFinite(amount) || amount <= 0) throw new ValidationError('Enter an amount above zero.');
+    if (amount > 1e13) throw new ValidationError('That amount is too large.');
+    const at = this.iso();
+    const entry: EarningEntry = { id: uuid(), dateKey: input.dateKey, amount, note: (input.note ?? '').trim().slice(0, 200), createdAt: at, updatedAt: at, deletedAt: null };
+    await this.db.earnings.add(entry);
+    return entry;
+  }
+
+  async deleteEarning(id: ID): Promise<void> {
+    const at = this.iso();
+    await this.db.earnings.update(id, { deletedAt: at, updatedAt: at });
+  }
+
+  async restoreEarning(id: ID): Promise<void> {
+    await this.db.earnings.update(id, { deletedAt: null, updatedAt: this.iso() });
+  }
+
+  /** The look shown on the platform: a rank form or an unlocked suit. */
+  async setOutfit(outfitId: string): Promise<void> {
+    await this.db.kv.put({ key: KV.outfit, value: outfitId });
+  }
+
+  // ---------- Unlocks ----------
+
+  /**
+   * Stores newly earned badges and cosmetics. Earned records are permanent;
+   * this only ever adds. Returns reveal keys (`badge:<id>` or the cosmetic id)
+   * for what is new.
+   */
+  async recordUnlocks(badges: Map<BadgeId, ID[]>, cosmetics: string[]): Promise<string[]> {
+    return this.db.transaction('rw', this.db.achievements, this.db.cosmetics, async () => {
+      const at = this.iso();
+      const fresh: string[] = [];
+      const haveBadges = new Set((await this.db.achievements.toArray()).map((a) => a.achievementId));
+      for (const [id, sources] of badges) {
+        if (haveBadges.has(id)) continue;
+        await this.db.achievements.add({ id: uuid(), achievementId: id, unlockedAt: at, triggeringSourceIds: sources, ruleVersion: RULES_VERSION });
+        fresh.push(`badge:${id}`);
+      }
+      const haveCosmetics = new Set((await this.db.cosmetics.toArray()).map((c) => c.cosmeticId));
+      for (const id of cosmetics) {
+        if (haveCosmetics.has(id)) continue;
+        await this.db.cosmetics.add({ id: uuid(), cosmeticId: id, unlockedAt: at, ruleVersion: RULES_VERSION });
+        fresh.push(id);
+      }
+      return fresh;
+    });
+  }
+
+  /** Opens an achieved goal's reward chest once. The platform inside is fixed per goal. */
+  async openChest(goalId: ID): Promise<Platform> {
+    return this.db.transaction('rw', this.db.goals, this.db.cosmetics, async () => {
+      const goal = await this.db.goals.get(goalId);
+      if (!goal || goal.status !== 'achieved') throw new ValidationError('This chest opens when the goal is achieved.');
+      const all = await this.db.cosmetics.toArray();
+      const chestKey = cosmeticId.chest(goalId);
+      const opened = all.find((c) => c.cosmeticId === chestKey);
+      if (opened?.contents) return platformById(opened.contents.slice('stage:'.length));
+      const owned = new Set(all.map((c) => c.cosmeticId));
+      const platform = chestPlatform(goalId, owned);
+      const stageKey = cosmeticId.platform(platform.id);
+      const at = this.iso();
+      await this.db.cosmetics.add({ id: uuid(), cosmeticId: chestKey, unlockedAt: at, ruleVersion: RULES_VERSION, contents: stageKey });
+      if (!owned.has(stageKey)) await this.db.cosmetics.add({ id: uuid(), cosmeticId: stageKey, unlockedAt: at, ruleVersion: RULES_VERSION });
+      return platform;
+    });
+  }
+
+  /** The platform under the character. Only owned platforms can be equipped. */
+  async setPlatform(platformId: string): Promise<void> {
+    if (platformId !== 'base' && !(await this.db.cosmetics.where('cosmeticId').equals(cosmeticId.platform(platformId)).first())) {
+      throw new ValidationError('Unlock this platform first.');
+    }
+    await this.db.kv.put({ key: KV.platform, value: platformId });
+  }
+
+  /** Finish Strong is an explicit choice, available from the sprint's last day. */
+  async setSprintFinished(planId: ID, finished: boolean, today: DateKey): Promise<void> {
+    await this.db.transaction('rw', this.db.plans, async () => {
+      const plan = await this.db.plans.get(planId);
+      if (!plan || plan.kind !== 'sprint') throw new ValidationError('Only a sprint can be finished strong.');
+      if (finished && compareKeys(today, plan.endDate) < 0) throw new ValidationError('You can mark the sprint finished from its last day.');
+      await this.db.plans.put({ ...plan, finishedAt: finished ? this.iso() : null, updatedAt: this.iso() });
+    });
   }
 
   // ---------- Period direction (today, this week, this month) ----------

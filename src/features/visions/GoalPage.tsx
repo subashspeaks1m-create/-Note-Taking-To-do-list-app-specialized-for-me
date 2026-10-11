@@ -8,7 +8,8 @@ import { useTodayKey } from '../../date/clock';
 import { dateKeyInZone, formatMedium, formatShort, formatTimeInZone } from '../../date/localDate';
 import { dailyNeeded, formatAmount, PLAN_KIND_LABEL } from '../../domain/goals';
 import type { GoalStatus, GoalUpdate, Task } from '../../domain/models';
-import { useGoalBoard } from '../../storage/queries';
+import { useGoalBoard, useUnlockRecords } from '../../storage/queries';
+import { ChestCard } from '../character/Chests';
 import { useProfile, useRepo } from '../../storage/StorageProvider';
 import { buildBoard, type GoalView } from './boardModel';
 import { GoalEditor } from './GoalEditor';
@@ -24,6 +25,7 @@ export function GoalPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const board = useGoalBoard();
+  const unlocks = useUnlockRecords();
   const model = useMemo(() => (board ? buildBoard(board, today, { includeArchived: true }) : null), [board, today]);
   const [editing, setEditing] = useState<'edit' | 'sub' | null>(null);
 
@@ -150,7 +152,15 @@ export function GoalPage() {
         )}
       </section>
 
-      {goal.sealedReward && <RewardPanel achieved={goal.status === 'achieved'} reward={goal.sealedReward} />}
+      {plan && (plan.kind === 'sprint' || plan.kind === 'year') && goal.status !== 'archived' ? (
+        unlocks && (
+          <ul className="chests chests--single" aria-label="Reward chest">
+            <ChestCard item={{ goal, plan }} owned={new Map(unlocks.cosmetics.map((c) => [c.cosmeticId, c]))} compact />
+          </ul>
+        )
+      ) : (
+        goal.sealedReward && <RewardPanel achieved={goal.status === 'achieved'} reward={goal.sealedReward} />
+      )}
 
       <HistoryPanel view={view} tz={tz} entries={board.entries.filter((e) => e.goalIds.includes(goal.id) || e.taskIds.some((id) => view.tasks.some((t) => t.id === id)))} />
 
