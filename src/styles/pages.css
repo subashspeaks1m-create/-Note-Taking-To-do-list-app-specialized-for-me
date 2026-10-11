@@ -924,3 +924,19 @@
 .coach__meta { margin: 10px 0 0; font-size: var(--text-xs); color: var(--muted); }
 .coach__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .coach__error { margin: 8px 0 0; font-size: var(--text-sm); color: var(--warning); }
+
+/* ---------- Demo mode ---------- */
+.demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--warning) 60%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  font-size: var(--text-sm);
+}
+.demo-banner strong { color: var(--warning); text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--text-xs); }
+.demo-banner span { flex: 1 1 260px; color: var(--muted); }

@@ -332,6 +332,18 @@ describe('principles', () => {
   });
 });
 
+describe('time zone change (acceptance #18)', () => {
+  it('a completion keeps its Asia/Kolkata date after the profile moves to another zone', async () => {
+    clock = new Date('2026-10-10T19:00:00Z'); // 00:30 on Oct 11 in Kolkata, still Oct 10 in New York
+    const t = await repo.addTask({ title: 'Late night push', category: 'doing', scheduledDate: '2026-10-10' });
+    await repo.setTaskStatus(t.id, 'completed', TZ);
+    await repo.updateProfile({ timeZone: 'America/New_York' });
+    const after = await db.tasks.get(t.id);
+    expect(after!.completionLocalDate).toBe('2026-10-11');
+    expect(after!.award!.earnedDate).toBe('2026-10-11');
+  });
+});
+
 describe('XP ledger', () => {
   const totals = async () => {
     const { xpTotals } = await import('../domain/ledger');
