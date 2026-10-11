@@ -5,7 +5,7 @@ import { Icon } from '../../components/Icon';
 import { EmptyState } from '../../components/Page';
 import { useToast } from '../../components/Toasts';
 import { useTodayKey } from '../../date/clock';
-import { formatMedium, isDateKey } from '../../date/localDate';
+import { compareKeys, formatMedium, isDateKey } from '../../date/localDate';
 import { PLAN_KIND_LABEL } from '../../domain/goals';
 import type { VisionPlan } from '../../domain/models';
 import { sprintCountdown } from '../../domain/plans';
@@ -134,6 +134,33 @@ export function PlanPage() {
             What success looks like
           </h2>
           <EditableText label="Success criteria" value={plan.successCriteria} placeholder="Write the result that would make you proud on the last day." onSave={(successCriteria) => save({ successCriteria })} />
+          {plan.kind === 'sprint' && (
+            <div className="finish-strong">
+              {plan.finishedAt ? (
+                <>
+                  <p className="finish-strong__done">You marked this sprint finished strong.</p>
+                  <button type="button" className="link-btn link-btn--quiet" onClick={() => void repo.setSprintFinished(plan.id, false, today)}>
+                    Undo
+                  </button>
+                </>
+              ) : compareKeys(today, plan.endDate) >= 0 ? (
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  onClick={() =>
+                    repo
+                      .setSprintFinished(plan.id, true, today)
+                      .then(() => toast({ message: 'Sprint finished strong. Badge earned.', tone: 'gold' }))
+                      .catch((e: Error) => toast({ message: e.message, tone: 'error' }))
+                  }
+                >
+                  I met it: mark the sprint finished strong
+                </button>
+              ) : (
+                <p className="finish-strong__note">From the sprint's last day you can mark it finished strong here, if you met what you wrote above. That earns the Finish Strong badge.</p>
+              )}
+            </div>
+          )}
         </section>
         <section className="panel" aria-labelledby="review-heading">
           <h2 id="review-heading" className="panel__title">

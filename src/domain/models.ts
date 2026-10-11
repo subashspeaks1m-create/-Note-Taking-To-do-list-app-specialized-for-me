@@ -31,6 +31,8 @@ export interface VisionPlan {
   successCriteria: string;
   /** The latest written review of this plan. */
   review: string;
+  /** Sprint only: set when the user explicitly marks it finished strong (on or after its last day). */
+  finishedAt?: Instant | null;
   archivedAt: Instant | null;
   createdAt: Instant;
   updatedAt: Instant;
@@ -175,6 +177,8 @@ export interface CosmeticUnlock {
   cosmeticId: string;
   unlockedAt: Instant;
   ruleVersion: number;
+  /** For an opened reward chest: the cosmetic found inside, e.g. `stage:nebula`. */
+  contents?: string;
 }
 
 export type MeasurementMode = 'manual' | 'milestones' | 'numeric' | 'tasks';

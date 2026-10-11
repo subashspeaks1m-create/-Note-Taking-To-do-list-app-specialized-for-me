@@ -3,6 +3,7 @@ import { Icon } from '../../components/Icon';
 import { Menu, type MenuItem } from '../../components/Menu';
 import { formatShort } from '../../date/localDate';
 import type { Task } from '../../domain/models';
+import { useSound } from '../../app/sound';
 import { XP_RULES } from '../../domain/config';
 import { PRIORITY_LABEL } from '../../domain/tasks';
 
@@ -45,6 +46,7 @@ export const TaskRow = memo(function TaskRow({
   const moved = task.originalScheduledDate && task.scheduledDate && task.originalScheduledDate !== task.scheduledDate;
   // Bumped when the user checks the task off, to play one celebration burst.
   const [burst, setBurst] = useState(0);
+  const sound = useSound();
 
   return (
     <li
@@ -77,7 +79,10 @@ export const TaskRow = memo(function TaskRow({
             checked={done}
             disabled={canceled}
             onChange={() => {
-              if (!done) setBurst((n) => n + 1);
+              if (!done) {
+                setBurst((n) => n + 1);
+                sound('complete');
+              }
               onToggle(task);
             }}
             aria-label={`${done ? 'Mark not done' : 'Complete'}: ${task.title}`}

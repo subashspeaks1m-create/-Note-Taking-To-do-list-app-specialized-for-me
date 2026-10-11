@@ -15,7 +15,16 @@ const RUNES = 'PURSUIT OF GREATNESS · LEARN · BUILD · EARN · BECOME · ';
  * scrubbed frame by frame with the platform, so he turns all the way round.
  * A still look turns the platform and sways slightly.
  */
-export function CharacterStage({ look, label }: { look: Look; label: string }) {
+interface StageProps {
+  look: Look;
+  label: string;
+  /** Platform skin id ('base' is the rune disc). */
+  platform?: string;
+  /** Streak transformation aura; dimmed while the streak is below its length. */
+  aura?: { id: string; lit: boolean } | null;
+}
+
+export function CharacterStage({ look, label, platform = 'base', aura = null }: StageProps) {
   const reduced = useReducedMotion();
   const discRef = useRef<HTMLDivElement>(null);
   const figureRef = useRef<HTMLDivElement>(null);
@@ -73,7 +82,7 @@ export function CharacterStage({ look, label }: { look: Look; label: string }) {
 
   return (
     <div
-      className={`stage stage--${look.accent}`}
+      className={`stage stage--${look.accent} plat--${platform}`}
       role="group"
       tabIndex={0}
       aria-roledescription="character stage"
@@ -86,6 +95,7 @@ export function CharacterStage({ look, label }: { look: Look; label: string }) {
     >
       <div className="stage__beam" aria-hidden="true" />
       <div className="stage__platform" aria-hidden="true">
+        <span className="stage__deco" />
         <div ref={discRef} className="stage__disc">
           <svg viewBox="0 0 400 400">
             <defs>
@@ -113,6 +123,7 @@ export function CharacterStage({ look, label }: { look: Look; label: string }) {
       </div>
 
       <div key={look.id} className="stage__figure-wrap">
+        {aura && <span className={`stage__aura aura--${aura.id} ${aura.lit ? '' : 'aura--dim'}`} aria-hidden="true" />}
         <span className="stage__flash" aria-hidden="true" />
         <div ref={figureRef} className="stage__figure">
           {look.spin ? (

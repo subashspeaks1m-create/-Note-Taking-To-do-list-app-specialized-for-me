@@ -14,6 +14,8 @@ export interface DisplayPrefs {
   motion: 'system' | 'full' | 'reduced';
   lowGraphics: boolean;
   avatarPlayback: 'auto' | 'still';
+  /** Soft sounds for finished tasks and unlocks. Off unless turned on. */
+  sound: 'off' | 'on';
   /** The build stage whose preview note was dismissed (0 = none). */
   stageBannerDismissed: number;
 }
@@ -26,6 +28,7 @@ const DEFAULTS: DisplayPrefs = {
   motion: 'system',
   lowGraphics: false,
   avatarPlayback: 'auto',
+  sound: 'off',
   stageBannerDismissed: 0,
 };
 

@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { compareKeys, type DateKey } from '../date/localDate';
-import type { EarningEntry, Goal, Principle, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
+import type { AchievementUnlock, CosmeticUnlock, EarningEntry, Goal, Principle, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
 import { dayActivity, type DayActivity } from '../domain/intensity';
 import type { ActivitySource } from '../domain/stats';
 import { isOpen } from '../domain/tasks';
@@ -183,4 +183,51 @@ export function useOutfit(): string | null | undefined {
 export function usePrinciples(): Principle[] | undefined {
   const { db } = useStorage();
   return useLiveQuery(async () => ((await db.kv.get('principles'))?.value as Principle[] | undefined) ?? [], [db]);
+}
+
+/** The platform equipped under the character ('base' when none was picked). */
+export function usePlatform(): string | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => ((await db.kv.get('platform'))?.value as string | undefined) ?? 'base', [db]);
+}
+
+export interface UnlockRecords {
+  achievements: AchievementUnlock[];
+  cosmetics: CosmeticUnlock[];
+  milestones: Milestone[];
+  directions: PeriodDirection[];
+  plans: VisionPlan[];
+}
+
+/** Stored unlocks plus the records badges are judged on. */
+export function useUnlockRecords(): UnlockRecords | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => {
+    const [achievements, cosmetics, milestones, directions, plans] = await Promise.all([
+      db.achievements.toArray(),
+      db.cosmetics.toArray(),
+      db.milestones.toArray(),
+      db.periodDirections.filter((d) => d.kind !== 'day').toArray(),
+      db.plans.toArray(),
+    ]);
+    return { achievements, cosmetics, milestones, directions, plans };
+  }, [db]);
+}
+
+export interface ChestGoal {
+  goal: Goal;
+  plan: VisionPlan;
+}
+
+/** Goals in the sprint and 1-year plans: each one carries a sealed reward chest. */
+export function useChestGoals(): ChestGoal[] | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => {
+    const plans = (await db.plans.toArray()).filter((p) => (p.kind === 'sprint' || p.kind === 'year') && !p.archivedAt);
+    const byId = new Map(plans.map((p) => [p.id, p]));
+    const goals = (await db.goals.toArray()).map(withGoalDefaults).filter((g) => g.planId && byId.has(g.planId) && g.status !== 'archived');
+    return goals
+      .map((goal) => ({ goal, plan: byId.get(goal.planId!)! }))
+      .sort((a, b) => Number(b.goal.status === 'achieved') - Number(a.goal.status === 'achieved') || a.plan.endDate.localeCompare(b.plan.endDate) || a.goal.rank - b.goal.rank);
+  }, [db]);
 }

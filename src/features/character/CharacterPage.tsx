@@ -1,20 +1,25 @@
-import { useMemo, useState, type CSSProperties, type FormEvent } from 'react';
+import { useState, type CSSProperties, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { asset } from '../../app/asset';
+import { Art } from '../../components/art/Art';
 import { Icon } from '../../components/Icon';
+import { LevelRing, Meter } from '../../components/Progress';
 import { PageHeader, StageNote } from '../../components/Page';
 import { useToast } from '../../components/Toasts';
 import { useTodayKey } from '../../date/clock';
-import { formatMedium, isDateKey, type DateKey } from '../../date/localDate';
+import { dateKeyInZone, formatMedium, isDateKey, type DateKey } from '../../date/localDate';
 import {
   FORMS, SUITS, currentForm, formatMoney, isUnlocked, lookById, nextForm, progressToward, remainingText, requirementText,
-  type CharacterStats, type Look,
+  type Look,
 } from '../../domain/character';
-import { BADGES } from '../../domain/config';
-import { consistency } from '../../domain/stats';
-import { useActivitySource, useEarnings, useOutfit } from '../../storage/queries';
+import { BADGES, rankLabel } from '../../domain/config';
+import { PLATFORMS, TRANSFORMATIONS, cosmeticId, platformById, transformationState } from '../../domain/unlocks';
+import { useChestGoals, useEarnings, useOutfit, usePlatform } from '../../storage/queries';
 import { useProfile, useRepo } from '../../storage/StorageProvider';
 import { CharacterStage } from './CharacterStage';
+import { ChestCard, PlatformSwatch } from './Chests';
 import { Silhouette } from './Silhouette';
+import { useGameState, type GameState } from './useGame';
 
 /** Art that exists so far. Each look gains `image` and `spin` as Prem makes them. */
 const ART: Record<string, Pick<Look, 'image' | 'spin'>> = {
@@ -29,30 +34,26 @@ const withArt = (look: Look): Look => ({ ...look, ...ART[look.id] });
 export function CharacterPage() {
   const profile = useProfile();
   const today = useTodayKey(profile.timeZone);
-  const source = useActivitySource();
-  const earnings = useEarnings();
+  const game = useGameState();
   const outfit = useOutfit();
+  const platform = usePlatform();
+  const chests = useChestGoals();
   const repo = useRepo();
   const toast = useToast();
   const [preview, setPreview] = useState<string | null>(null);
 
-  const stats: CharacterStats = useMemo(() => {
-    const habit = source ? consistency(source, today, profile.weekStart ?? 'monday') : null;
-    return {
-      earned: (earnings ?? []).reduce((sum, e) => sum + e.amount, 0),
-      bestStreak: habit?.streak.longest ?? 0,
-      tasksDone: source?.tasks.filter((t) => t.status === 'completed').length ?? 0,
-      learningEntries: source?.entries.filter((e) => e.kind === 'learning' && e.plainText.trim()).length ?? 0,
-      entries: source?.entries.filter((e) => e.plainText.trim()).length ?? 0,
-    };
-  }, [source, earnings, today, profile.weekStart]);
+  if (!game) return <div className="page page--character" />;
+  const { stats, progress, habit } = game;
 
   const form = currentForm(stats);
   const next = nextForm(stats);
   const chosen = outfit ? lookById(outfit) : null;
-  const equipped = chosen && isUnlocked(chosen, stats) ? chosen : form;
+  const equipped = chosen && game.lookUnlocked(chosen) ? chosen : form;
   const shown = withArt(preview ? lookById(preview) : equipped);
   const previewing = preview !== null && preview !== equipped.id;
+  const ownedPlatform = (id: string) => id === 'base' || game.owned.has(cosmeticId.platform(id));
+  const platformId = platform && ownedPlatform(platform) ? platform : 'base';
+  const tf = transformationState(habit.streak.longest, habit.streak.current);
 
   const equip = async (look: Look) => {
     try {
@@ -64,18 +65,32 @@ export function CharacterPage() {
     }
   };
 
+  const equipPlatform = async (id: string) => {
+    try {
+      await repo.setPlatform(id);
+      toast({ message: `${platformById(id).name} platform equipped`, tone: 'success' });
+    } catch (e) {
+      toast({ message: (e as Error).message, tone: 'error' });
+    }
+  };
+
   return (
     <div className="page page--character">
       <PageHeader overline="Character Chamber" title="Your character" art="shield" artMotion="pop" />
 
       <section className={`chamber chamber--stage accent--${shown.accent}`} aria-label="Your character">
         <div className="chamber__stage-wrap">
-          <CharacterStage look={shown} label={`${shown.name}${previewing ? ', trying on' : ', equipped'}`} />
+          <CharacterStage
+            look={shown}
+            platform={platformId}
+            aura={tf.earned ? { id: tf.earned.id, lit: tf.lit } : null}
+            label={`${shown.name}${previewing ? ', trying on' : ', equipped'}`}
+          />
           <span className="chamber__equipped">
             {previewing ? (
               <>
                 Trying on <strong>{shown.name}</strong>
-                {!isUnlocked(shown, stats) && ' · locked'}
+                {!game.lookUnlocked(shown) && ' · locked'}
               </>
             ) : (
               <>
@@ -91,13 +106,23 @@ export function CharacterPage() {
         </div>
 
         <div className="chamber__panel">
-          <div>
-            <p className="overline">Rank form</p>
-            <p className="chamber__rank">{form.name}</p>
+          <div className="chamber__levels">
+            <LevelRing fraction={progress.global.fraction} level={progress.global.level} size={64} label={`Level ${progress.global.level}, ${progress.global.xp} XP`} />
+            <div>
+              <p className="overline">{rankLabel(progress.global.level)}</p>
+              <p className="chamber__rank">Level {progress.global.level}</p>
+              <p className="chamber__xp tabular">
+                {progress.global.xp} / {progress.global.nextLevelAt} XP
+              </p>
+            </div>
+          </div>
+          <div className="chamber__meters">
+            <Meter tone="learning" label="Learning" fraction={progress.learning.fraction} valueText={`Lv ${progress.learning.level} · ${progress.learning.xp} XP`} />
+            <Meter tone="doing" label="Doing" fraction={progress.doing.fraction} valueText={`Lv ${progress.doing.level} · ${progress.doing.xp} XP`} />
           </div>
 
           <div className="earn">
-            <p className="overline">Earned so far</p>
+            <p className="overline">Rank form · {form.name}</p>
             <p className="earn__total tabular">${stats.earned.toLocaleString('en-US')}</p>
             {next ? (
               <>
@@ -124,43 +149,107 @@ export function CharacterPage() {
           </ol>
 
           <EarningForm today={today} />
-          <p className="chamber__fine">Only money you log counts. Nothing you unlock is ever taken away.</p>
+          <p className="chamber__fine">Only money you log counts. Suits, forms and badges you earn from habits are never taken away.</p>
         </div>
       </section>
 
+      <h2 className="section-title">Transformations</h2>
+      <p className="section-sub">
+        Earned by your streak and kept forever. The aura glows at full while your current streak is at least that long.
+        {' '}Current streak <strong className="tabular">{habit.streak.current}</strong>, best <strong className="tabular">{habit.streak.longest}</strong>.
+      </p>
+      <ul className="forms">
+        {TRANSFORMATIONS.map((t) => {
+          const earned = habit.streak.longest >= t.days;
+          const lit = earned && habit.streak.current >= t.days;
+          const pct = Math.min(100, Math.round((habit.streak.longest / t.days) * 100));
+          return (
+            <li key={t.id} className={`form-card form-card--${t.id} ${earned ? 'is-earned' : ''} ${lit ? 'is-lit' : ''}`}>
+              <span className={`form-card__aura aura--${t.id} ${earned && !lit ? 'aura--dim' : ''}`} aria-hidden="true" />
+              <Art name={t.id === 'legend' ? 'fire' : t.id === 'godhead' ? 'crown' : t.id === 'awakened' ? 'high-voltage' : 'sparkles'} size={34} motion="float" />
+              <p className="form-card__name">{t.name}</p>
+              <p className="form-card__req tabular">{t.days}-day streak</p>
+              <p className="form-card__desc">{t.description}</p>
+              <p className="form-card__state">{earned ? (lit ? 'Earned · aura lit' : `Earned · relights at ${t.days} days`) : `${habit.streak.longest} of ${t.days} days`}</p>
+              {!earned && (
+                <div className="suit__progress" aria-hidden="true" style={{ '--pct': `${pct}%` } as CSSProperties}>
+                  <span />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
       <h2 className="section-title">Rank forms</h2>
       <p className="section-sub">Who you become as your earnings grow.</p>
-      <LookGrid looks={FORMS} stats={stats} equippedId={equipped.id} shownId={shown.id} onTry={setPreview} onEquip={equip} />
+      <LookGrid looks={FORMS} game={game} equippedId={equipped.id} shownId={shown.id} onTry={setPreview} onEquip={equip} />
 
       <h2 className="section-title">Hero suits</h2>
       <p className="section-sub">Unlocked by streaks, finished work, learning and money. Tap any suit to try it on.</p>
-      <LookGrid looks={SUITS} stats={stats} equippedId={equipped.id} shownId={shown.id} onTry={setPreview} onEquip={equip} />
+      <LookGrid looks={SUITS} game={game} equippedId={equipped.id} shownId={shown.id} onTry={setPreview} onEquip={equip} />
+
+      <h2 className="section-title">Platforms</h2>
+      <p className="section-sub">What you stand on. Some are earned by milestones; the rarest only come out of reward chests.</p>
+      <ul className="platforms">
+        {PLATFORMS.map((p) => {
+          const have = ownedPlatform(p.id);
+          const on = p.id === platformId;
+          return (
+            <li key={p.id} className={`platform-card ${have ? '' : 'platform-card--locked'} ${on ? 'platform-card--on' : ''}`}>
+              {have || !p.chest ? <PlatformSwatch id={p.id} size={120} /> : <span className="platform-card__mystery" aria-hidden="true">?</span>}
+              <p className="platform-card__name">{have || !p.chest ? p.name : 'Hidden platform'}</p>
+              <p className="platform-card__how">{have ? p.description : p.how}</p>
+              <button type="button" className="btn btn--quiet btn--sm" disabled={!have || on} onClick={() => void equipPlatform(p.id)}>
+                {on ? 'Equipped' : have ? 'Equip' : 'Locked'}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <h2 className="section-title">Reward chests</h2>
+      <p className="section-sub">Every goal in your 82-day sprint and your 1-year plan carries a sealed chest. Achieve the goal to open it.</p>
+      {chests && chests.length > 0 ? (
+        <ul className="chests">
+          {chests.map((c) => (
+            <ChestCard key={c.goal.id} item={c} owned={game.owned} />
+          ))}
+        </ul>
+      ) : (
+        <p className="panel__empty">
+          No chests yet. Add a goal to your <Link to="/visions#sprint">sprint or 1-year plan</Link> and a chest appears here.
+        </p>
+      )}
 
       <EarningsLog />
 
       <h2 className="section-title">Badges</h2>
       <ul className="badges">
-        {BADGES.map((b) => (
-          <li key={b.id} className="badge badge--locked">
-            <img src={b.image} alt="" width={48} height={48} />
-            <div>
-              <p className="badge__name">{b.name}</p>
-              <p className="badge__req">{b.requirement}</p>
-            </div>
-          </li>
-        ))}
+        {BADGES.map((b) => {
+          const got = game.badgeUnlocks.get(b.id);
+          return (
+            <li key={b.id} className={`badge ${got ? 'badge--earned' : 'badge--locked'}`}>
+              <img src={b.image} alt="" width={48} height={48} />
+              <div>
+                <p className="badge__name">{b.name}</p>
+                <p className="badge__req">{got ? `Earned ${formatMedium(dateKeyInZone(new Date(got.unlockedAt), profile.timeZone))}` : b.requirement}</p>
+              </div>
+            </li>
+          );
+        })}
       </ul>
 
-      <StageNote stage={5}>Next in stage 5: a 360° spin clip for each look, suit art, XP, badges and streak transformations.</StageNote>
+      <StageNote stage={5}>Suit art and 360° spin clips are added as you make them. Everything else on this page works now.</StageNote>
     </div>
   );
 }
 
 function LookGrid({
-  looks, stats, equippedId, shownId, onTry, onEquip,
+  looks, game, equippedId, shownId, onTry, onEquip,
 }: {
   looks: readonly Look[];
-  stats: CharacterStats;
+  game: GameState;
   equippedId: string;
   shownId: string;
   onTry: (id: string) => void;
@@ -170,7 +259,8 @@ function LookGrid({
     <ul className="wardrobe">
       {looks.map((raw) => {
         const look = withArt(raw);
-        const unlocked = isUnlocked(look, stats);
+        const { stats } = game;
+        const unlocked = game.lookUnlocked(look);
         const isEquipped = look.id === equippedId;
         const pct = Math.round(progressToward(look, stats) * 100);
         return (

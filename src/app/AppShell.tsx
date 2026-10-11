@@ -1,3 +1,4 @@
+import { UnlockWatcher } from '../features/character/UnlockReveal';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useMatch } from 'react-router-dom';
 import { Art } from '../components/art/Art';
@@ -59,7 +60,7 @@ export function AppShell() {
         {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
             <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
-            <span>Step 1 of stage 5: the Character page has a spinning platform, an earnings log, money-based rank forms and 10 hero suits to try on. 360° clips, XP and transformations come next.</span>
+            <span>Stage 5: real XP and levels, badges, streak transformations, platforms and reward chests are live. Suit art and 360° clips arrive as you make them.</span>
             <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>
@@ -67,6 +68,7 @@ export function AppShell() {
         )}
         {!location.pathname.startsWith('/insights') && <ReportReady inbox={inbox} />}
         <Outlet />
+        <UnlockWatcher />
       </main>
       <BottomBar inbox={inbox} />
     </div>

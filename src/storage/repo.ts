@@ -10,6 +10,8 @@ import { RECURRENCE_HORIZON_DAYS, seriesOccursOn } from '../domain/recurrence';
 import { normalizeTitle, rankBetween, ValidationError, withStatus } from '../domain/tasks';
 import { addDays, compareKeys } from '../date/localDate';
 import { desiredAwards, reconcile } from '../domain/ledger';
+import { chestPlatform, cosmeticId, platformById, type Platform } from '../domain/unlocks';
+import type { BadgeId } from '../domain/config';
 import { SCHEMA_VERSION, type AppDatabase } from './db';
 
 export const uuid = (): ID => crypto.randomUUID();
@@ -76,7 +78,7 @@ export const MAX_REVISIONS_PER_ENTRY = 40;
 /** Autosaves closer together than this update the newest checkpoint instead of adding one. */
 export const CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000;
 
-const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', principles: 'principles' } as const;
+const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', platform: 'platform', principles: 'principles' } as const;
 
 /**
  * Typed storage operations. Components call these instead of touching
@@ -899,6 +901,70 @@ export class Repository {
   /** The look shown on the platform: a rank form or an unlocked suit. */
   async setOutfit(outfitId: string): Promise<void> {
     await this.db.kv.put({ key: KV.outfit, value: outfitId });
+  }
+
+  // ---------- Unlocks ----------
+
+  /**
+   * Stores newly earned badges and cosmetics. Earned records are permanent;
+   * this only ever adds. Returns reveal keys (`badge:<id>` or the cosmetic id)
+   * for what is new.
+   */
+  async recordUnlocks(badges: Map<BadgeId, ID[]>, cosmetics: string[]): Promise<string[]> {
+    return this.db.transaction('rw', this.db.achievements, this.db.cosmetics, async () => {
+      const at = this.iso();
+      const fresh: string[] = [];
+      const haveBadges = new Set((await this.db.achievements.toArray()).map((a) => a.achievementId));
+      for (const [id, sources] of badges) {
+        if (haveBadges.has(id)) continue;
+        await this.db.achievements.add({ id: uuid(), achievementId: id, unlockedAt: at, triggeringSourceIds: sources, ruleVersion: RULES_VERSION });
+        fresh.push(`badge:${id}`);
+      }
+      const haveCosmetics = new Set((await this.db.cosmetics.toArray()).map((c) => c.cosmeticId));
+      for (const id of cosmetics) {
+        if (haveCosmetics.has(id)) continue;
+        await this.db.cosmetics.add({ id: uuid(), cosmeticId: id, unlockedAt: at, ruleVersion: RULES_VERSION });
+        fresh.push(id);
+      }
+      return fresh;
+    });
+  }
+
+  /** Opens an achieved goal's reward chest once. The platform inside is fixed per goal. */
+  async openChest(goalId: ID): Promise<Platform> {
+    return this.db.transaction('rw', this.db.goals, this.db.cosmetics, async () => {
+      const goal = await this.db.goals.get(goalId);
+      if (!goal || goal.status !== 'achieved') throw new ValidationError('This chest opens when the goal is achieved.');
+      const all = await this.db.cosmetics.toArray();
+      const chestKey = cosmeticId.chest(goalId);
+      const opened = all.find((c) => c.cosmeticId === chestKey);
+      if (opened?.contents) return platformById(opened.contents.slice('stage:'.length));
+      const owned = new Set(all.map((c) => c.cosmeticId));
+      const platform = chestPlatform(goalId, owned);
+      const stageKey = cosmeticId.platform(platform.id);
+      const at = this.iso();
+      await this.db.cosmetics.add({ id: uuid(), cosmeticId: chestKey, unlockedAt: at, ruleVersion: RULES_VERSION, contents: stageKey });
+      if (!owned.has(stageKey)) await this.db.cosmetics.add({ id: uuid(), cosmeticId: stageKey, unlockedAt: at, ruleVersion: RULES_VERSION });
+      return platform;
+    });
+  }
+
+  /** The platform under the character. Only owned platforms can be equipped. */
+  async setPlatform(platformId: string): Promise<void> {
+    if (platformId !== 'base' && !(await this.db.cosmetics.where('cosmeticId').equals(cosmeticId.platform(platformId)).first())) {
+      throw new ValidationError('Unlock this platform first.');
+    }
+    await this.db.kv.put({ key: KV.platform, value: platformId });
+  }
+
+  /** Finish Strong is an explicit choice, available from the sprint's last day. */
+  async setSprintFinished(planId: ID, finished: boolean, today: DateKey): Promise<void> {
+    await this.db.transaction('rw', this.db.plans, async () => {
+      const plan = await this.db.plans.get(planId);
+      if (!plan || plan.kind !== 'sprint') throw new ValidationError('Only a sprint can be finished strong.');
+      if (finished && compareKeys(today, plan.endDate) < 0) throw new ValidationError('You can mark the sprint finished from its last day.');
+      await this.db.plans.put({ ...plan, finishedAt: finished ? this.iso() : null, updatedAt: this.iso() });
+    });
   }
 
   // ---------- Period direction (today, this week, this month) ----------

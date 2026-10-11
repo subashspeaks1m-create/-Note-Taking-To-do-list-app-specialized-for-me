@@ -393,3 +393,31 @@ describe('XP ledger', () => {
     expect((await totals()).doing).toBe(20);
   });
 });
+
+describe('unlocks and chests', () => {
+  it('records each badge and cosmetic once, permanently', async () => {
+    const first = await repo.recordUnlocks(new Map([['first-step', ['t1']]]), ['look:web-runner']);
+    expect(first).toEqual(['badge:first-step', 'look:web-runner']);
+    expect(await repo.recordUnlocks(new Map([['first-step', ['t1']]]), ['look:web-runner'])).toEqual([]);
+    expect(await db.achievements.count()).toBe(1);
+  });
+
+  it('opens an achieved goal chest once and always shows the same prize', async () => {
+    const sprint = (await db.plans.toArray()).find((p) => p.kind === 'sprint')!;
+    const goal = await repo.createGoal({ title: 'Ship v1', planId: sprint.id, category: 'doing', measurementMode: 'manual', sealedReward: 'New headphones' }, '2026-10-10');
+    await expect(repo.openChest(goal.id)).rejects.toThrow(/achieved/);
+    await repo.setGoalStatus(goal.id, 'achieved', '2026-10-10');
+    const prize = await repo.openChest(goal.id);
+    expect(prize.chest).toBe(true);
+    expect((await repo.openChest(goal.id)).id).toBe(prize.id);
+    await repo.setPlatform(prize.id);
+    await expect(repo.setPlatform('void-gate' === prize.id ? 'sunforge' : 'void-gate')).rejects.toThrow(/Unlock/);
+  });
+
+  it('Finish Strong can only be marked from the sprint last day', async () => {
+    const sprint = (await db.plans.toArray()).find((p) => p.kind === 'sprint')!;
+    await expect(repo.setSprintFinished(sprint.id, true, '2026-12-30')).rejects.toThrow(/last day/);
+    await repo.setSprintFinished(sprint.id, true, '2026-12-31');
+    expect((await db.plans.get(sprint.id))!.finishedAt).toBeTruthy();
+  });
+});
