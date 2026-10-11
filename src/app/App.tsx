@@ -7,6 +7,8 @@ import { ClockProvider } from '../date/clock';
 const PwaUpdater = import.meta.env.VITE_ROUTER === 'memory' ? null : lazy(() => import('./pwa').then((m) => ({ default: m.PwaUpdater })));
 import { CalendarPage } from '../features/calendar/CalendarPage';
 import { CharacterPage } from '../features/character/CharacterPage';
+// Three.js is large, so the vault and its 3D viewer load only when opened.
+const VaultPage = lazy(() => import('../features/vault/VaultPage'));
 import { InsightsPage } from '../features/insights/InsightsPage';
 import { JournalEntryPage } from '../features/journal/JournalEntryPage';
 import { JournalPage } from '../features/journal/JournalPage';
@@ -37,6 +39,7 @@ const routes: RouteObject[] = [
       { path: 'journal/:entryId', element: <JournalEntryPage /> },
       { path: 'principles', element: <PrinciplesPage /> },
       { path: 'character', element: <CharacterPage /> },
+      { path: 'vault', element: <Suspense fallback={<div className="page page--vault" />}><VaultPage /></Suspense> },
       { path: 'insights', element: <InsightsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <NotFoundPage /> },

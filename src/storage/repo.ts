@@ -1,4 +1,5 @@
 import type { JSONContent } from '@tiptap/core';
+import { OUTFITS } from '../domain/wardrobe';
 import { dateKeyInZone, type DateKey } from '../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, RULES_VERSION, type Category, type Effort } from '../domain/config';
 import type {
@@ -87,7 +88,7 @@ export const MAX_REVISIONS_PER_ENTRY = 40;
 /** Autosaves closer together than this update the newest checkpoint instead of adding one. */
 export const CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000;
 
-const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', platform: 'platform', principles: 'principles', preImport: 'preImportBackup' } as const;
+const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', wearing: 'wearing', platform: 'platform', principles: 'principles', preImport: 'preImportBackup' } as const;
 
 /**
  * Typed storage operations. Components call these instead of touching
@@ -998,6 +999,12 @@ export class Repository {
 
   async restoreContent(id: ID): Promise<void> {
     await this.db.contentLog.update(id, { deletedAt: null, updatedAt: this.iso() });
+  }
+
+  /** The vault outfit worn today. Every outfit is open, so only the id is checked. */
+  async setWearing(outfitId: string): Promise<void> {
+    if (!OUTFITS.some((o) => o.id === outfitId)) throw new ValidationError('That outfit is not in the vault.');
+    await this.db.kv.put({ key: KV.wearing, value: outfitId });
   }
 
   /** The look shown on the platform: a rank form or an unlocked suit. */

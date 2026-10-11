@@ -195,7 +195,9 @@ export function CharacterPage() {
       <LookGrid looks={FORMS} game={game} equippedId={equipped.id} shownId={shown.id} onTry={setPreview} onEquip={equip} />
 
       <h2 className="section-title">Hero suits</h2>
-      <p className="section-sub">Unlocked by streaks, finished work, learning and money. Tap any suit to try it on.</p>
+      <p className="section-sub">
+        All open from day one: wear whichever fits the day. See them in 3D in the <Link to="/vault">Vault</Link>.
+      </p>
       <LookGrid looks={SUITS} game={game} equippedId={equipped.id} shownId={shown.id} onTry={setPreview} onEquip={equip} />
 
       <h2 className="section-title">Platforms</h2>

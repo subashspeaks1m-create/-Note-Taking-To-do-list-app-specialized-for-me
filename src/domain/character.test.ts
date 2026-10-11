@@ -23,10 +23,8 @@ describe('rank forms', () => {
 });
 
 describe('hero suits', () => {
-  it('unlock from the best streak, so a broken streak keeps them', () => {
-    const symbiote = lookById('symbiote');
-    expect(isUnlocked(symbiote, { ...zero, bestStreak: 29 })).toBe(false);
-    expect(isUnlocked(symbiote, { ...zero, bestStreak: 30 })).toBe(true);
+  it('are all open from the start', () => {
+    for (const suit of SUITS) expect(isUnlocked(suit, zero)).toBe(true);
   });
 
   it('has ten suits with unique ids, separate from the forms', () => {

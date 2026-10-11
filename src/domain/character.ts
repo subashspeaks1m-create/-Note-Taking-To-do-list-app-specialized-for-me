@@ -1,8 +1,7 @@
 /**
- * The character's looks. Rank forms are earned from lifetime earnings; hero
- * suits from streaks, finished work, learning and money. Everything is
- * computed from recorded data, and once a look is unlocked it stays unlocked:
- * streak rules use the best streak ever, not the current one.
+ * The character's looks. Rank forms are earned from lifetime earnings and
+ * computed from recorded data. Hero suits are all open from the start, to wear
+ * by the day and the mood.
  */
 
 export type Accent = 'neutral' | 'learning' | 'doing' | 'gold' | 'crimson' | 'violet' | 'ink' | 'ember' | 'storm';
@@ -46,21 +45,18 @@ export const FORMS: readonly Look[] = [
   { id: 'sovereign', name: 'Sovereign', description: 'White-gold crowned armor with a light cape.', requirement: { kind: 'earned', amount: 1_000_000_000 }, accent: 'gold' },
 ];
 
-/**
- * Hero suits: original designs in the spirit of the references, switchable
- * any time once unlocked.
- */
+/** Hero suits: original designs in the spirit of the references, all open from day one. */
 export const SUITS: readonly Look[] = [
-  { id: 'web-runner', name: 'Web Runner', description: 'Red and navy web-lined stealth suit.', requirement: { kind: 'streak', days: 7 }, accent: 'crimson' },
-  { id: 'mercenary', name: 'Mercenary', description: 'Red and black tactical suit with twin blades.', requirement: { kind: 'tasks', count: 50 }, accent: 'crimson' },
-  { id: 'sorcerer', name: 'Sorcerer', description: 'Deep blue robes, crimson cloak, glowing amulet.', requirement: { kind: 'learningEntries', count: 30 }, accent: 'violet' },
-  { id: 'symbiote', name: 'Symbiote', description: 'Living black suit with a white emblem. It takes over your body.', requirement: { kind: 'streak', days: 30 }, accent: 'ink' },
-  { id: 'thunder', name: 'Thunder Lord', description: 'Black plate armor, crimson cape, storm hammer.', requirement: { kind: 'tasks', count: 150 }, accent: 'storm' },
-  { id: 'arc-armor', name: 'Arc Armor', description: 'Red and gold powered armor with a glowing core.', requirement: { kind: 'earned', amount: 250_000 }, accent: 'gold' },
-  { id: 'showman', name: 'Showman', description: 'Purple long coat, green vest, pinstripes.', requirement: { kind: 'entries', count: 100 }, accent: 'violet' },
-  { id: 'mech-arms', name: 'Mech Arms', description: 'Green trench coat with four mechanical arms.', requirement: { kind: 'learningEntries', count: 100 }, accent: 'storm' },
-  { id: 'dark-knight', name: 'Dark Knight', description: 'Matte black armor, cowl and long cape.', requirement: { kind: 'streak', days: 90 }, accent: 'ink' },
-  { id: 'flame-rider', name: 'Flame Rider', description: 'Spiked leather jacket, chains and a burning head.', requirement: { kind: 'earned', amount: 10_000_000 }, accent: 'ember' },
+  { id: 'web-runner', name: 'Web Runner', description: 'Red and navy web-lined stealth suit.', requirement: { kind: 'start' }, accent: 'crimson' },
+  { id: 'mercenary', name: 'Mercenary', description: 'Red and black tactical suit with twin blades.', requirement: { kind: 'start' }, accent: 'crimson' },
+  { id: 'sorcerer', name: 'Sorcerer', description: 'Deep blue robes, crimson cloak, glowing amulet.', requirement: { kind: 'start' }, accent: 'violet' },
+  { id: 'symbiote', name: 'Symbiote', description: 'Living black suit with a white emblem. It takes over your body.', requirement: { kind: 'start' }, accent: 'ink' },
+  { id: 'thunder', name: 'Thunder Lord', description: 'Black plate armor, crimson cape, storm hammer.', requirement: { kind: 'start' }, accent: 'storm' },
+  { id: 'arc-armor', name: 'Arc Armor', description: 'Red and gold powered armor with a glowing core.', requirement: { kind: 'start' }, accent: 'gold' },
+  { id: 'showman', name: 'Showman', description: 'Purple long coat, green vest, pinstripes.', requirement: { kind: 'start' }, accent: 'violet' },
+  { id: 'mech-arms', name: 'Mech Arms', description: 'Green trench coat with four mechanical arms.', requirement: { kind: 'start' }, accent: 'storm' },
+  { id: 'dark-knight', name: 'Dark Knight', description: 'Matte black armor, cowl and long cape.', requirement: { kind: 'start' }, accent: 'ink' },
+  { id: 'flame-rider', name: 'Flame Rider', description: 'Spiked leather jacket, chains and a burning head.', requirement: { kind: 'start' }, accent: 'ember' },
 ];
 
 export const ALL_LOOKS: readonly Look[] = [...FORMS, ...SUITS];
