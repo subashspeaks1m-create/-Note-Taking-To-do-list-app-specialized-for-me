@@ -31,6 +31,7 @@ export function StorageProvider({ children, dbName = REAL_DB_NAME }: { children:
     let cancelled = false;
     repo
       .ensureInitialized()
+      .then(() => repo.repairLedger())
       .then(() => !cancelled && setBoot({ status: 'ready' }))
       .catch((e: unknown) => {
         if (cancelled) return;

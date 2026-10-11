@@ -3,12 +3,13 @@ import { dateKeyInZone, type DateKey } from '../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, RULES_VERSION, type Category, type Effort } from '../domain/config';
 import type {
   EarningEntry, EntryKind, Principle, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
-  Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan,
+  Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan, XPEvent,
 } from '../domain/models';
 import { wouldCreateCycle } from '../domain/goals';
 import { RECURRENCE_HORIZON_DAYS, seriesOccursOn } from '../domain/recurrence';
 import { normalizeTitle, rankBetween, ValidationError, withStatus } from '../domain/tasks';
 import { addDays, compareKeys } from '../date/localDate';
+import { desiredAwards, reconcile } from '../domain/ledger';
 import { SCHEMA_VERSION, type AppDatabase } from './db';
 
 export const uuid = (): ID => crypto.randomUUID();
@@ -131,6 +132,34 @@ export class Repository {
     });
   }
 
+  // ---------- XP ledger ----------
+
+  /**
+   * Appends whatever compensating events make the ledger match the source
+   * records. Always runs inside the caller's transaction, which must include
+   * tasks, entries and xpEvents.
+   */
+  private async syncLedger(): Promise<XPEvent[]> {
+    const [tasks, entries, events] = await Promise.all([
+      this.db.tasks.filter((t) => !!t.award).toArray(),
+      this.db.entries.filter((e) => !!e.documentedAt).toArray(),
+      this.db.xpEvents.toArray(),
+    ]);
+    const added = reconcile(desiredAwards(tasks, entries), events, uuid, this.iso());
+    if (added.length) await this.db.xpEvents.bulkAdd(added);
+    return added;
+  }
+
+  private async heldXp(sourceType: XPEvent['sourceType'], sourceId: string): Promise<number> {
+    const events = await this.db.xpEvents.where('sourceId').equals(sourceId).toArray();
+    return events.filter((e) => e.sourceType === sourceType).reduce((sum, e) => sum + e.delta, 0);
+  }
+
+  /** Brings the ledger up to date with the records (on startup, so data from before stage 5 earns its XP). */
+  async repairLedger(): Promise<number> {
+    return this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => (await this.syncLedger()).length);
+  }
+
   async getProfile(): Promise<Profile> {
     const row = await this.db.kv.get(KV.profile);
     return (row?.value as Profile | undefined) ?? { id: 'me', ...PROFILE_DEFAULTS, createdAt: this.iso(), updatedAt: this.iso() };
@@ -209,7 +238,7 @@ export class Repository {
   }
 
   async updateTask(id: ID, patch: TaskPatch): Promise<Task> {
-    return this.db.transaction('rw', this.db.tasks, async () => {
+    return this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       const task = await this.mustGetTask(id);
       const next: Task = {
         ...task,
@@ -219,36 +248,50 @@ export class Repository {
         revision: task.revision + 1,
       };
       await this.db.tasks.put(next);
+      // Reclassifying a completed task moves its frozen award between tracks.
+      if (next.award && next.category !== task.category) await this.syncLedger();
       return next;
     });
   }
 
-  async setTaskStatus(id: ID, status: TaskStatus, timeZone: string): Promise<{ before: Task; after: Task }> {
-    return this.db.transaction('rw', this.db.tasks, async () => {
+  /**
+   * Changes status and settles the XP ledger in the same transaction. `xp` is
+   * the net change for this task's completion; `capped` means the task was
+   * recorded but today's track cap held back some or all of its reward.
+   */
+  async setTaskStatus(id: ID, status: TaskStatus, timeZone: string): Promise<{ before: Task; after: Task; xp: number; capped: boolean }> {
+    return this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       const before = await this.mustGetTask(id);
       const after = withStatus(before, status, this.now(), timeZone);
       if (after !== before) await this.db.tasks.put(after);
-      return { before, after };
+      const added = await this.syncLedger();
+      const xp = added.filter((e) => e.sourceId === id && e.sourceType === 'task-completion').reduce((sum, e) => sum + e.delta, 0);
+      const held = await this.heldXp('task-completion', id);
+      const capped = status === 'completed' && before.status !== 'completed' && !!after.award && held < after.award.nominalXp;
+      return { before, after, xp, capped };
     });
   }
 
   /** Soft delete; `restoreTask` brings it back with its completion and award intact. */
   async deleteTasks(ids: ID[]): Promise<void> {
-    await this.db.transaction('rw', this.db.tasks, async () => {
+    await this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       const at = this.iso();
       for (const id of ids) {
         const task = await this.db.tasks.get(id);
         if (task && !task.deletedAt) await this.db.tasks.put({ ...task, deletedAt: at, updatedAt: at, revision: task.revision + 1 });
       }
+      await this.syncLedger();
     });
   }
 
   async restoreTasks(ids: ID[]): Promise<void> {
-    await this.db.transaction('rw', this.db.tasks, async () => {
+    await this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       for (const id of ids) {
         const task = await this.db.tasks.get(id);
         if (task?.deletedAt) await this.db.tasks.put({ ...task, deletedAt: null, updatedAt: this.iso(), revision: task.revision + 1 });
       }
+      // Undo restores the earlier allocation instead of awarding something new.
+      await this.syncLedger();
     });
   }
 
@@ -411,7 +454,7 @@ export class Repository {
    * Otherwise throws ConflictError and changes nothing, so neither version is lost.
    */
   async saveEntry(id: ID, content: EntryContent, baseRevision: number): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current) throw new ValidationError('This entry no longer exists.');
       if (current.revision !== baseRevision) throw new ConflictError(current);
@@ -426,6 +469,7 @@ export class Repository {
       };
       await this.db.entries.put(next);
       await this.checkpoint(next, 'checkpoint');
+      if (current.documentedAt && !next.documentedAt) await this.syncLedger();
       return next;
     });
   }
@@ -459,7 +503,7 @@ export class Repository {
 
   /** Overwrites with the local draft after a conflict, keeping the other version in history. */
   async saveEntryOverConflict(id: ID, content: EntryContent): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current) throw new ValidationError('This entry no longer exists.');
       await this.db.entryRevisions.add({
@@ -491,18 +535,19 @@ export class Repository {
   }
 
   async updateEntryMeta(id: ID, patch: Partial<Pick<JournalEntry, 'kind' | 'happenedAt' | 'taskIds' | 'tags' | 'pinned' | 'title'>>): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current) throw new ValidationError('This entry no longer exists.');
       const next = { ...current, ...patch, updatedAt: this.iso(), revision: current.revision + 1 };
       await this.db.entries.put(next);
+      if (current.documentedAt && (patch.taskIds || patch.kind)) await this.syncLedger();
       return next;
     });
   }
 
   /** Documented requires an explicit choice and nonblank text. */
   async setDocumented(id: ID, documented: boolean): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current) throw new ValidationError('This entry no longer exists.');
       if (documented && !current.plainText.trim()) throw new ValidationError('Write something before marking this entry documented.');
@@ -513,23 +558,26 @@ export class Repository {
         revision: current.revision + 1,
       };
       await this.db.entries.put(next);
+      await this.syncLedger();
       return next;
     });
   }
 
   async deleteEntry(id: ID): Promise<void> {
-    await this.db.transaction('rw', this.db.entries, this.db.entryRevisions, async () => {
+    await this.db.transaction('rw', this.db.entries, this.db.entryRevisions, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (!current || current.deletedAt) return;
       await this.checkpoint({ ...current, updatedAt: this.iso() }, 'before-delete');
       await this.db.entries.put({ ...current, deletedAt: this.iso(), updatedAt: this.iso(), revision: current.revision + 1 });
+      if (current.documentedAt) await this.syncLedger();
     });
   }
 
   async restoreEntry(id: ID): Promise<void> {
-    await this.db.transaction('rw', this.db.entries, async () => {
+    await this.db.transaction('rw', this.db.entries, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(id);
       if (current?.deletedAt) await this.db.entries.put({ ...current, deletedAt: null, updatedAt: this.iso(), revision: current.revision + 1 });
+      if (current?.documentedAt) await this.syncLedger();
     });
   }
 
@@ -548,7 +596,7 @@ export class Repository {
   }
 
   async restoreRevision(entryId: ID, revisionId: ID): Promise<JournalEntry> {
-    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, async () => {
+    return this.db.transaction('rw', this.db.entries, this.db.entryRevisions, this.db.tasks, this.db.xpEvents, async () => {
       const current = await this.db.entries.get(entryId);
       const rev = await this.db.entryRevisions.get(revisionId);
       if (!current || !rev) throw new ValidationError('That version is no longer available.');
@@ -565,6 +613,7 @@ export class Repository {
         revision: current.revision + 1,
       };
       await this.db.entries.put(next);
+      if (current.documentedAt) await this.syncLedger();
       return next;
     });
   }
