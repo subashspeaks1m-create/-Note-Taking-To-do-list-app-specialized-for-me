@@ -1,10 +1,16 @@
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useReducedMotion } from '../../app/displayPrefs';
 import { Art } from '../../components/art/Art';
 import type { Look } from '../../domain/character';
 import type { GearState } from '../../domain/equipment';
+import type { Outfit } from '../../domain/wardrobe';
+import type { ModelSource } from '../vault/models';
 import { CharacterPortrait } from './CharacterPortrait';
+import type { StageModelHandle } from './StageModel';
 import { Silhouette } from './Silhouette';
+
+// Three.js is large, so the 3D model loads only when there is one to show.
+const StageModel = lazy(() => import('./StageModel').then((m) => ({ default: m.StageModel })));
 
 const IDLE_DEG_PER_SEC = 14;
 const DRAG_DEG_PER_PX = 0.6;
@@ -26,9 +32,11 @@ interface StageProps {
   aura?: { id: string; lit: boolean } | null;
   /** Gear that orbits the platform; slots with nothing yet are left out. */
   gear?: GearState[];
+  /** Your real 3D model in today's outfit; shown instead of the 2D look when it loads. */
+  model?: { source: ModelSource; outfit: Outfit } | null;
 }
 
-export function CharacterStage({ look, label, platform = 'base', aura = null, gear = [] }: StageProps) {
+export function CharacterStage({ look, label, platform = 'base', aura = null, gear = [], model = null }: StageProps) {
   const reduced = useReducedMotion();
   const discRef = useRef<HTMLDivElement>(null);
   const figureRef = useRef<HTMLDivElement>(null);
@@ -37,13 +45,20 @@ export function CharacterStage({ look, label, platform = 'base', aura = null, ge
   const angle = useRef(0);
   const drag = useRef<{ x: number; start: number } | null>(null);
   const lastTouch = useRef(0);
+  const modelRef = useRef<StageModelHandle>(null);
+  const [modelFailed, setModelFailed] = useState(false);
+  const [modelReady, setModelReady] = useState(false);
+  const use3d = !!model && !modelFailed;
 
   useEffect(() => {
     const apply = () => {
       const a = angle.current;
       if (discRef.current) discRef.current.style.transform = `rotateX(74deg) rotateZ(${-a}deg)`;
       const video = videoRef.current;
-      if (video && video.duration > 0) {
+      if (use3d) {
+        modelRef.current?.setYaw(a);
+        if (figureRef.current) figureRef.current.style.transform = '';
+      } else if (video && video.duration > 0) {
         const t = ((((a % 360) + 360) % 360) / 360) * video.duration;
         if (Math.abs(video.currentTime - t) > 0.02) video.currentTime = t;
       } else if (figureRef.current) {
@@ -75,7 +90,7 @@ export function CharacterStage({ look, label, platform = 'base', aura = null, ge
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [reduced, look.id]);
+  }, [reduced, look.id, use3d]);
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -152,19 +167,26 @@ export function CharacterStage({ look, label, platform = 'base', aura = null, ge
         </div>
       )}
 
-      <div key={look.id} className="stage__figure-wrap">
+      <div key={use3d ? '3d' : look.id} className="stage__figure-wrap">
         {aura && <span className={`stage__aura aura--${aura.id} ${aura.lit ? '' : 'aura--dim'}`} aria-hidden="true" />}
         <span className="stage__flash" aria-hidden="true" />
         <div ref={figureRef} className="stage__figure">
-          {look.spin ? (
-            <video ref={videoRef} className="stage__media" src={look.spin} poster={look.image} muted playsInline preload="auto" />
-          ) : look.id === 'base' ? (
-            <CharacterPortrait variant="chamber" className="stage__portrait" />
-          ) : look.image ? (
-            <img className="stage__media" src={look.image} alt="" draggable={false} />
-          ) : (
-            <Silhouette look={look} />
+          {use3d && (
+            <Suspense fallback={null}>
+              <StageModel ref={modelRef} source={model!.source} outfit={model!.outfit} onReady={() => setModelReady(true)} onFail={() => setModelFailed(true)} />
+            </Suspense>
           )}
+          {/* The 2D look stays until the 3D model has loaded, and is the fallback if it can't. */}
+          {!(use3d && modelReady) &&
+            (look.spin ? (
+              <video ref={videoRef} className="stage__media" src={look.spin} poster={look.image} muted playsInline preload="auto" />
+            ) : look.id === 'base' ? (
+              <CharacterPortrait variant="chamber" className="stage__portrait" />
+            ) : look.image ? (
+              <img className="stage__media" src={look.image} alt="" draggable={false} />
+            ) : (
+              <Silhouette look={look} />
+            ))}
         </div>
       </div>
 

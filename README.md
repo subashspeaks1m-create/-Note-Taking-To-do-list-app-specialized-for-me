@@ -55,8 +55,9 @@ source-assets  original kit media, kept for provenance, not shipped
 - `scholar.webp`, `builder.webp`, `ascendant.webp`: the kit's generated suit portraits
   (real alpha), resized to 900 px. They are static artwork. In-app motion and owner-made
   video loops arrive in stage 5.
-- `public/assets/vault/`: outfit concept pictures from the Vision Full Body kit (static). Real 3D
-  outfits load from `src/assets/models/` once added; until then the Vault shows a stand-in.
+- `public/assets/vault/`: outfit pictures (concept art and renders of the 3D model).
+- `src/assets/models/subash-wardrobe.glb`: your 3D character with all 14 outfits, used by the
+  Vault and the Character page. See [docs/3D_MODEL.md](docs/3D_MODEL.md).
 - SVG icons, badges and stage art, and WAV cues: original kit assets. Fluent Emoji art and
   line-md icons are MIT. See the acceptance report for the full list.
 

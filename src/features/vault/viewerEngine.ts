@@ -11,7 +11,7 @@ import { buildStandIn } from './standIn';
 
 export type ViewerStatus =
   | { state: 'loading' }
-  | { state: 'model'; triangles: number; clips: string[] }
+  | { state: 'model'; triangles: number; clips: string[]; hasHelmet: boolean }
   | { state: 'stand-in'; reason: 'no-model' | 'missing-outfit' }
   | { state: 'error'; message: string };
 
@@ -75,22 +75,39 @@ export function bodyBounds(root: THREE.Object3D): THREE.Box3 {
   return box.isEmpty() ? visibleBounds(root) : box;
 }
 
-/** Layered file: show one `outfit_<id>` node, hide the others and the body parts it covers. */
-export function applyLayeredOutfit(scene: THREE.Object3D, node: string): boolean {
+const parts = (raw: unknown): Set<string> => {
+  const list = Array.isArray(raw) ? (raw as string[]) : typeof raw === 'string' ? raw.split(/[\s,]+/) : [];
+  return new Set(list.filter(Boolean).map((h) => `body_${h.replace(/^body_/, '')}`));
+};
+
+/** A helmet, mask or cowl piece inside an outfit (`helmet: true` in its custom properties). */
+const isHelmet = (o: THREE.Object3D) => o.userData.helmet === true || o.userData.helmet === 1 || o.userData.helmet === 'true';
+
+/**
+ * Layered file: show one `outfit_<id>` node, hide the others and the body parts
+ * it covers. Helmet pieces show only when `helmet` is on, and then also hide the
+ * parts listed in `helmet_hides` (the head). Returns null when the outfit isn't in the file.
+ */
+export function applyLayeredOutfit(scene: THREE.Object3D, node: string, helmet = false): { hasHelmet: boolean } | null {
   const outfits: THREE.Object3D[] = [];
   scene.traverse((o) => {
     if (o.name.startsWith('outfit_')) outfits.push(o);
   });
   const chosen = outfits.find((o) => o.name === node);
-  if (!chosen) return false;
+  if (!chosen) return null;
   for (const o of outfits) o.visible = o === chosen;
-  const raw = chosen.userData.hides as string[] | string | undefined;
-  const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[\s,]+/) : [];
-  const hides = new Set(list.filter(Boolean).map((h) => `body_${h.replace(/^body_/, '')}`));
+  const helmets: THREE.Object3D[] = [];
+  chosen.traverse((o) => {
+    if (o !== chosen && isHelmet(o)) helmets.push(o);
+  });
+  const wearing = helmet && helmets.length > 0;
+  for (const h of helmets) h.visible = wearing;
+  const hides = parts(chosen.userData.hides);
+  if (wearing) for (const p of parts(chosen.userData.helmet_hides ?? 'head')) hides.add(p);
   scene.traverse((o) => {
     if (o.name.startsWith('body_')) o.visible = !hides.has(o.name);
   });
-  return true;
+  return { hasHelmet: helmets.length > 0 };
 }
 
 /**
@@ -121,8 +138,18 @@ export class ViewerEngine {
   private reducedMotion = false;
   private breathe = true;
   private clips: string[] = [];
+  private helmet = false;
+  private hasHelmet = false;
+  private lastShown: { source: ModelSource | null; colors: StandInColors } | null = null;
 
-  constructor(private host: HTMLElement, private onStatus: (s: ViewerStatus) => void) {
+  /**
+   * `embedded`: the model alone on a transparent canvas, for pages that draw
+   * their own platform. No disc, no orbit controls; the page turns it with `setYaw`.
+   */
+  private embedded: boolean;
+
+  constructor(private host: HTMLElement, private onStatus: (s: ViewerStatus) => void, opts: { embedded?: boolean } = {}) {
+    this.embedded = !!opts.embedded;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -150,7 +177,7 @@ export class ViewerEngine {
     back.position.set(1.5, 1.5, -2.5);
     this.scene.add(back);
 
-    // Platform: dark metal disc, glowing ring and a soft contact shadow.
+    // Platform: dark metal disc, glowing ring and a soft contact shadow (not when embedded).
     const disc = new THREE.Mesh(
       new THREE.CylinderGeometry(0.78, 0.84, 0.08, 64),
       // Low metalness and dimmed reflections keep the top dark from every side;
@@ -158,14 +185,14 @@ export class ViewerEngine {
       new THREE.MeshStandardMaterial({ color: '#070a0f', metalness: 0.2, roughness: 0.85, envMapIntensity: 0.04 }),
     );
     disc.position.y = -0.04;
-    this.scene.add(disc);
+    if (!this.embedded) this.scene.add(disc);
     this.ring = new THREE.Mesh(
       new THREE.TorusGeometry(0.8, 0.008, 12, 96),
       new THREE.MeshStandardMaterial({ color: '#79deec', emissive: '#79deec', emissiveIntensity: 1.1 }),
     );
     this.ring.rotation.x = Math.PI / 2;
     this.ring.position.y = 0.002;
-    this.scene.add(this.ring);
+    if (!this.embedded) this.scene.add(this.ring);
     const shadowTex = (() => {
       const c = document.createElement('canvas');
       c.width = c.height = 128;
@@ -180,7 +207,7 @@ export class ViewerEngine {
     const shadow = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = 0.003;
-    this.scene.add(shadow);
+    if (!this.embedded) this.scene.add(shadow);
     this.scene.add(this.root);
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -191,6 +218,7 @@ export class ViewerEngine {
     this.controls.maxPolarAngle = POLAR_MAX;
     this.controls.autoRotateSpeed = 1.6;
     this.controls.rotateSpeed = 0.8;
+    this.controls.enabled = !this.embedded;
 
     this.draco = new DRACOLoader();
     this.draco.setDecoderPath(asset('/draco/'));
@@ -220,6 +248,13 @@ export class ViewerEngine {
     this.rim.color.set(color);
   }
 
+  /** Helmet, mask or cowl on or off; remembered across outfits. */
+  setHelmet(on: boolean) {
+    if (this.helmet === on) return;
+    this.helmet = on;
+    if (this.lastShown?.source?.kind === 'layered') void this.show(this.lastShown.source, this.lastShown.colors);
+  }
+
   setMotion(opts: { autoRotate: boolean; reducedMotion: boolean }) {
     this.reducedMotion = opts.reducedMotion;
     this.controls.autoRotate = opts.autoRotate;
@@ -229,6 +264,8 @@ export class ViewerEngine {
   /** Show an outfit: its real model when one exists, else the labeled stand-in. */
   async show(source: ModelSource | null, colors: StandInColors) {
     const token = ++this.loadToken;
+    this.lastShown = { source, colors };
+    this.hasHelmet = false;
     if (!source) {
       this.mount(buildStandIn(colors), null, true);
       this.onStatus({ state: 'stand-in', reason: 'no-model' });
@@ -250,15 +287,17 @@ export class ViewerEngine {
         }
         const layered = this.layered!;
         // Pick the outfit before measuring, so a cape or helmet that is hidden doesn't skew the size.
-        if (!applyLayeredOutfit(layered.gltf.scene, source.node)) {
+        const applied = applyLayeredOutfit(layered.gltf.scene, source.node, this.helmet);
+        if (!applied) {
           this.mount(buildStandIn(colors), null, true);
           this.onStatus({ state: 'stand-in', reason: 'missing-outfit' });
           return;
         }
+        this.hasHelmet = applied.hasHelmet;
         if (this.current !== layered.gltf.scene) this.mount(layered.gltf.scene, layered.gltf, fresh);
         else this.fit();
       }
-      this.onStatus({ state: 'model', triangles: countTriangles(this.root), clips: this.clips });
+      this.onStatus({ state: 'model', triangles: countTriangles(this.root), clips: this.clips, hasHelmet: this.hasHelmet });
     } catch (e) {
       if (token !== this.loadToken) return;
       this.mount(buildStandIn(colors), null, true);
@@ -301,6 +340,7 @@ export class ViewerEngine {
 
   /** Frame the whole visible body, hair to shoe soles, for the current aspect. */
   fit() {
+    if (this.embedded) return this.fitEmbedded();
     const box = visibleBounds(this.root);
     if (box.isEmpty()) return;
     // Keep the floor in frame even when an outfit hides the feet.
@@ -320,6 +360,45 @@ export class ViewerEngine {
     this.controls.minDistance = dist * 0.45;
     this.controls.maxDistance = dist * 1.6;
     this.controls.update();
+  }
+
+  /** Embedded: feet on the bottom edge, the head near the top, seen straight on. */
+  private fitEmbedded() {
+    const box = this.current ? bodyBounds(this.current) : visibleBounds(this.root);
+    if (box.isEmpty()) return;
+    const top = box.max.y * 1.04;
+    const bottom = Math.min(0, box.min.y);
+    const half = (top - bottom) / 2;
+    const vFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const dist = half / Math.tan(vFov / 2);
+    const center = new THREE.Vector3(0, bottom + half, 0);
+    this.controls.target.copy(center);
+    this.camera.position.set(0, center.y, dist);
+    this.camera.lookAt(center);
+  }
+
+  /** Embedded: turn the character to this angle (degrees, 0 = facing you). */
+  setYaw(deg: number) {
+    this.root.rotation.y = THREE.MathUtils.degToRad(deg);
+  }
+
+  /** Close-up of the face from the front: the head's bounds, or the top of the body. */
+  face() {
+    if (!this.current) return;
+    const head = this.current.getObjectByName('body_head');
+    const box = head?.visible ? new THREE.Box3().setFromObject(head, true) : visibleBounds(this.root);
+    if (box.isEmpty()) return;
+    const size = box.getSize(new THREE.Vector3());
+    const c = box.getCenter(new THREE.Vector3());
+    // Without a visible head (a helmet is on), aim at the top of whatever is shown.
+    if (!head?.visible) c.y = box.max.y - Math.min(0.15, size.y * 0.08);
+    const span = head?.visible ? Math.max(size.y, 0.22) : 0.3;
+    const dist = (span * 0.5 * 1.9) / Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2);
+    this.controls.target.copy(c);
+    this.camera.position.set(c.x, c.y + span * 0.05, c.z + dist);
+    this.controls.minDistance = Math.min(this.controls.minDistance, dist * 0.8);
+    this.controls.update();
+    this.start();
   }
 
   /** Turn to an absolute angle around the character (0 = front, 180 = back). */
@@ -369,7 +448,7 @@ export class ViewerEngine {
       if (this.breathe && !this.mixer && this.current) {
         this.current.scale.y = this.current.scale.x * (1 + Math.sin(this.clock.elapsedTime * 1.6) * 0.004);
       }
-      this.controls.update();
+      if (!this.embedded) this.controls.update();
       this.renderer.render(this.scene, this.camera);
       this.raf = requestAnimationFrame(tick);
     };

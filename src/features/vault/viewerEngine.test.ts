@@ -16,6 +16,10 @@ function layered() {
   a.name = 'outfit_web-runner';
   a.userData.hides = ['torso', 'legs'];
   a.add(box('cloth', 1));
+  const mask = box('web-runner_helmet', 1.7);
+  mask.userData.helmet = true;
+  a.userData.helmet_hides = 'head';
+  a.add(mask);
   const b = new THREE.Group();
   b.name = 'outfit_dark-knight';
   b.userData.hides = 'body_torso, arms';
@@ -29,7 +33,7 @@ const visible = (scene: THREE.Object3D, name: string) => scene.getObjectByName(n
 describe('layered outfit file', () => {
   it('shows only the chosen outfit and hides the body parts it covers', () => {
     const scene = layered();
-    expect(applyLayeredOutfit(scene, 'outfit_web-runner')).toBe(true);
+    expect(applyLayeredOutfit(scene, 'outfit_web-runner')).toEqual({ hasHelmet: true });
     expect(visible(scene, 'outfit_web-runner')).toBe(true);
     expect(visible(scene, 'outfit_dark-knight')).toBe(false);
     expect([visible(scene, 'body_head'), visible(scene, 'body_torso'), visible(scene, 'body_legs')]).toEqual([true, false, false]);
@@ -42,8 +46,19 @@ describe('layered outfit file', () => {
     expect([visible(scene, 'body_head'), visible(scene, 'body_torso'), visible(scene, 'body_legs')]).toEqual([true, false, true]);
   });
 
+  it('keeps the helmet off by default; turning it on shows the mask and hides the head', () => {
+    const scene = layered();
+    applyLayeredOutfit(scene, 'outfit_web-runner');
+    expect([visible(scene, 'web-runner_helmet'), visible(scene, 'body_head')]).toEqual([false, true]);
+    applyLayeredOutfit(scene, 'outfit_web-runner', true);
+    expect([visible(scene, 'web-runner_helmet'), visible(scene, 'body_head')]).toEqual([true, false]);
+    // An outfit with no helmet ignores the switch and keeps the head.
+    expect(applyLayeredOutfit(scene, 'outfit_dark-knight', true)).toEqual({ hasHelmet: false });
+    expect(visible(scene, 'body_head')).toBe(true);
+  });
+
   it('reports an outfit missing from the file', () => {
-    expect(applyLayeredOutfit(layered(), 'outfit_sorcerer')).toBe(false);
+    expect(applyLayeredOutfit(layered(), 'outfit_sorcerer')).toBeNull();
   });
 
   it('sizes by the whole body, so a tall cape or hidden feet do not change it', () => {

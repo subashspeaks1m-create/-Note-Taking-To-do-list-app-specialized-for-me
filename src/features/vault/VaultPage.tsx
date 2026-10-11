@@ -11,7 +11,7 @@ import { useWearing } from '../../storage/queries';
 import { useProfile, useRepo } from '../../storage/StorageProvider';
 import { useGameState } from '../character/useGame';
 import { AvatarViewer, type ViewerHandle } from './AvatarViewer';
-import { THUMBS, modelSource } from './models';
+import { RENDERED_THUMBS, THUMBS, modelSource } from './models';
 import type { ViewerStatus } from './viewerEngine';
 
 type Filter = 'all' | OutfitCategory;
@@ -55,6 +55,7 @@ export function VaultPage() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [autoRotate, setAutoRotate] = useState(true);
+  const [helmet, setHelmet] = useState(false);
   const [status, setStatus] = useState<ViewerStatus | { state: 'no-webgl' }>({ state: 'loading' });
 
   const wornId = wearing ?? 'initiate';
@@ -154,7 +155,7 @@ export function VaultPage() {
         </aside>
 
         <section className="vault-stage" aria-label={`${shown.name} in 3D`}>
-          <AvatarViewer ref={viewer} outfit={shown} accent={tier.accent} autoRotate={autoRotate} reducedMotion={reduced} onStatus={setStatus} />
+          <AvatarViewer ref={viewer} outfit={shown} accent={tier.accent} autoRotate={autoRotate} reducedMotion={reduced} helmet={helmet} onStatus={setStatus} />
           <p className={`vault-status vault-status--${status.state}`} role="status">
             {statusText}
           </p>
@@ -170,12 +171,22 @@ export function VaultPage() {
             <button type="button" className="icon-btn" aria-label="Rotate right 45 degrees" onClick={() => viewer.current?.rotateBy(45)}>
               <Icon name="chevronRight" size={18} />
             </button>
+            {status.state === 'model' && (
+              <button type="button" className="vault-ctrl" onClick={() => viewer.current?.face()}>
+                Face
+              </button>
+            )}
             <button type="button" className="vault-ctrl" onClick={() => viewer.current?.fit()}>
               Fit
             </button>
             <button type="button" className="vault-ctrl" aria-pressed={autoRotate && !reduced} disabled={reduced} title={reduced ? 'Off while reduced motion is on' : undefined} onClick={() => setAutoRotate((v) => !v)}>
               Auto-rotate
             </button>
+            {status.state === 'model' && status.hasHelmet && (
+              <button type="button" className="vault-ctrl" aria-pressed={helmet} onClick={() => setHelmet((v) => !v)}>
+                Mask
+              </button>
+            )}
           </div>
         </section>
 
@@ -199,13 +210,18 @@ export function VaultPage() {
           )}
           <div className="vault-detail__art">
             <OutfitThumb outfit={shown} size="lg" />
-            <p className="vault-detail__caption">{THUMBS.has(shown.id) ? 'Concept picture' : 'Concept picture not made yet'}</p>
+            <p className="vault-detail__caption">{RENDERED_THUMBS.has(shown.id) ? 'Picture of your 3D model' : THUMBS.has(shown.id) ? 'Concept picture' : 'Concept picture not made yet'}</p>
           </div>
           <p className="vault-detail__model">
             {modelSource(shown.id)
-              ? '3D model added.'
+              ? 'Your 3D model in this outfit. Drag to turn, or use Face for a close-up.'
               : 'The 3D model of you in this outfit is not added yet, so a simple stand-in shows its colors.'}
           </p>
+          {modelSource(shown.id)?.kind === 'layered' && (
+            <p className="vault-detail__model vault-detail__credits">
+              3D body and clothing bases: MakeHuman community (CC0); hoodie, tank and shirt bases by Elvaerwyn (CC-BY). Face from your photos.
+            </p>
+          )}
           <div className="vault-detail__tier">
             <p className="overline">Tier · {tier.name}</p>
             <p className="vault-detail__next">{next ? `${next.name} at level ${next.minLevel}` : 'Highest tier reached'}</p>
