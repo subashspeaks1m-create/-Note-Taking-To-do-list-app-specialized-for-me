@@ -463,3 +463,13 @@ describe('vault', () => {
     expect((await db.kv.get('wearing'))?.value).toBe('dark-knight');
   });
 });
+
+describe('coach notes', () => {
+  it('saves notes per period, rejects empty ones and deletes them', async () => {
+    await repo.saveCoachNote('week', '2026-10-05', { model: 'm:free', text: '  ## Notes  ' });
+    expect((await db.kv.get('coach:week:2026-10-05'))?.value).toMatchObject({ model: 'm:free', text: '## Notes' });
+    await expect(repo.saveCoachNote('week', '2026-10-05', { model: 'm:free', text: '  ' })).rejects.toThrow('nothing to save');
+    await repo.deleteCoachNote('week', '2026-10-05');
+    expect(await db.kv.get('coach:week:2026-10-05')).toBeUndefined();
+  });
+});

@@ -8,6 +8,8 @@ import type { PeriodDirection } from '../../domain/models';
 import { periodKeyFor, periodRange, previousRange, type ActivitySource } from '../../domain/stats';
 import { useDirection } from '../../storage/queries';
 import { useRepo } from '../../storage/StorageProvider';
+import { CoachPanel } from '../coach/CoachPanel';
+import type { CoachGoal } from '../coach/coachPrompt';
 import { ReportCard, svgToPng } from './ReportCard';
 import { reportKey } from './reportInbox';
 import { buildReport, type ReportKind } from './reportModel';
@@ -22,10 +24,11 @@ interface Props {
   weekStart: WeekStart;
   name: string;
   goalsBehind: string[];
+  coachGoals: CoachGoal[];
   markSeen: (key: string) => void;
 }
 
-export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, weekStart, name, goalsBehind, markSeen }: Props) {
+export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, weekStart, name, goalsBehind, coachGoals, markSeen }: Props) {
   const report = useMemo(() => buildReport(source, kind, anchor, today, weekStart, minutesNow), [source, kind, anchor, today, weekStart, minutesNow]);
   const { range } = report;
   const nextRange = periodRange(kind, addDays(range.end, 1), weekStart);
@@ -94,6 +97,21 @@ export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, 
         </div>
 
         <div className="report__side">
+          <CoachPanel
+            kind={kind}
+            range={range}
+            stats={report.stats}
+            prevStats={report.prevStats}
+            streakAtEnd={report.streakAtEnd}
+            streakBreaks={report.streakBreaks}
+            tasks={source.tasks}
+            entries={source.entries}
+            goals={coachGoals}
+            focus={direction?.intention ?? ''}
+            review={direction?.review ?? ''}
+            blockers={direction?.blockers ?? ''}
+          />
+
           <ReviewForm key={`${kind}-${range.start}-${direction?.version ?? 0}`} kind={kind} range={range} nextRange={nextRange} direction={direction} nextDirection={nextDirection} />
 
           <section className="panel" aria-labelledby="evidence-heading">
