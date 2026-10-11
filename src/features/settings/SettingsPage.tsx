@@ -1,7 +1,10 @@
 import { useDisplayPrefs, type DisplayPrefs } from '../../app/displayPrefs';
 import { Art } from '../../components/art/Art';
-import { PageHeader, StageNote } from '../../components/Page';
-import { APP_NAME, PROFILE_DEFAULTS } from '../../domain/config';
+import { PageHeader } from '../../components/Page';
+import { APP_NAME } from '../../domain/config';
+import { DataSettings } from './DataSettings';
+import { InstallSetting } from './InstallSetting';
+import { ProfileSettings } from './ProfileSettings';
 
 function Choice<K extends keyof DisplayPrefs>({ label, prefKey, options }: { label: string; prefKey: K; options: { value: DisplayPrefs[K]; label: string }[] }) {
   const { prefs, setPref } = useDisplayPrefs();
@@ -26,23 +29,7 @@ export function SettingsPage() {
     <div className="page page--narrow">
       <PageHeader overline={APP_NAME} title="Settings" art="gear" artMotion="spin" />
 
-      <section className="settings-group" aria-labelledby="sg-profile">
-        <h2 id="sg-profile" className="settings-group__title">
-          Profile
-        </h2>
-        <div className="setting">
-          <span className="setting__label">Name</span>
-          <span className="setting__value">{PROFILE_DEFAULTS.displayName}</span>
-        </div>
-        <div className="setting">
-          <span className="setting__label">Time zone</span>
-          <span className="setting__value">{PROFILE_DEFAULTS.timeZone}</span>
-        </div>
-        <div className="setting">
-          <span className="setting__label">Week starts on</span>
-          <span className="setting__value">Monday</span>
-        </div>
-      </section>
+      <ProfileSettings />
 
       <section className="settings-group" aria-labelledby="sg-display">
         <h2 id="sg-display" className="settings-group__title">
@@ -54,6 +41,10 @@ export function SettingsPage() {
         <Choice label="Graphics" prefKey="lowGraphics" options={[{ value: false, label: 'Full' }, { value: true, label: 'Low' }]} />
         <Choice label="Sounds" prefKey="sound" options={[{ value: 'off', label: 'Off' }, { value: 'on', label: 'Soft chimes' }]} />
       </section>
+
+      <InstallSetting />
+
+      <DataSettings />
 
       <section className="settings-group" aria-labelledby="sg-credits">
         <h2 id="sg-credits" className="settings-group__title">
@@ -75,7 +66,6 @@ export function SettingsPage() {
         </ul>
       </section>
 
-      <StageNote stage={6}>Profile editing, sound, sprint dates, backup and restore, storage status and reset arrive in stage 6.</StageNote>
     </div>
   );
 }

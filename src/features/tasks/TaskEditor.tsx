@@ -1,3 +1,4 @@
+import { StaleNotice } from '../../components/StaleNotice';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { Dialog } from '../../components/Dialog';
@@ -8,6 +9,7 @@ import { describeRule } from '../../domain/recurrence';
 import { goalChain } from '../../domain/goals';
 import { withGoalDefaults } from '../../storage/queries';
 import { PRIORITY_LABEL } from '../../domain/tasks';
+import { StaleEditError } from '../../storage/repo';
 import { useRepo, useStorage } from '../../storage/StorageProvider';
 import { requestPersistenceOnce } from '../../storage/persistence';
 
@@ -70,6 +72,9 @@ export function TaskEditor({ task, defaultDate, defaultCategory, initialTitle = 
   const [goalIds, setGoalIds] = useState<ID[]>(task?.goalIds ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The revision this form started from, so an edit made in another tab is never silently overwritten.
+  const [baseRevision, setBaseRevision] = useState(task?.revision);
+  const [stale, setStale] = useState(false);
   const goalData = useLiveQuery(async () => ({ goals: (await db.goals.toArray()).map(withGoalDefaults), plans: await db.plans.toArray() }), [db]);
   const linkable = (goalData?.goals ?? []).filter((g) => (g.status === 'active' || g.status === 'paused') || goalIds.includes(g.id));
 
@@ -114,7 +119,7 @@ export function TaskEditor({ task, defaultDate, defaultCategory, initialTitle = 
           onSaved?.('Task added');
         }
       } else {
-        await repo.updateTask(task.id, fields);
+        await repo.updateTask(task.id, fields, baseRevision);
         if (scheduledDate !== task.scheduledDate) await repo.moveTasks([task.id], scheduledDate, 'reschedule');
         if (status !== task.status) await repo.setTaskStatus(task.id, status, timeZone);
         onSaved?.('Task saved');
@@ -122,7 +127,8 @@ export function TaskEditor({ task, defaultDate, defaultCategory, initialTitle = 
       void requestPersistenceOnce(repo);
       onClose();
     } catch (e) {
-      setError((e as Error).message || 'Could not save. Your changes are still here.');
+      if (e instanceof StaleEditError) setStale(true);
+      else setError((e as Error).message || 'Could not save. Your changes are still here.');
       setBusy(false);
     }
   };
@@ -354,6 +360,16 @@ export function TaskEditor({ task, defaultDate, defaultCategory, initialTitle = 
         <p className="form-error" role="alert">
           {error}
         </p>
+      )}
+      {stale && (
+        <StaleNotice
+          what="task"
+          onKeepTheirs={onClose}
+          onKeepMine={() => {
+            setStale(false);
+            setBaseRevision(undefined);
+          }}
+        />
       )}
     </Dialog>
   );

@@ -12,6 +12,7 @@ import { addDays, compareKeys } from '../date/localDate';
 import { desiredAwards, reconcile } from '../domain/ledger';
 import { chestPlatform, cosmeticId, platformById, type Platform } from '../domain/unlocks';
 import type { BadgeId } from '../domain/config';
+import { exportBackup, importBackup, TABLES, type Backup, type ImportMode, type ImportResult } from './backup';
 import { SCHEMA_VERSION, type AppDatabase } from './db';
 
 export const uuid = (): ID => crypto.randomUUID();
@@ -21,6 +22,14 @@ export class ConflictError extends Error {
   constructor(public readonly current: JournalEntry) {
     super('This entry was changed somewhere else.');
     this.name = 'ConflictError';
+  }
+}
+
+/** Thrown when a task or goal was changed elsewhere (another tab or window) while an edit form was open. */
+export class StaleEditError extends Error {
+  constructor(what: 'task' | 'goal') {
+    super(`This ${what} was changed in another tab or window while you were editing.`);
+    this.name = 'StaleEditError';
   }
 }
 
@@ -78,7 +87,7 @@ export const MAX_REVISIONS_PER_ENTRY = 40;
 /** Autosaves closer together than this update the newest checkpoint instead of adding one. */
 export const CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000;
 
-const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', platform: 'platform', principles: 'principles' } as const;
+const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', platform: 'platform', principles: 'principles', preImport: 'preImportBackup' } as const;
 
 /**
  * Typed storage operations. Components call these instead of touching
@@ -178,6 +187,70 @@ export class Repository {
     });
   }
 
+  /** Name, time zone and week start. Past day keys never move when the zone changes. */
+  async updateProfile(patch: Partial<Pick<Profile, 'displayName' | 'timeZone' | 'weekStart'>>): Promise<Profile> {
+    return this.db.transaction('rw', this.db.kv, async () => {
+      const current = await this.getProfile();
+      const displayName = patch.displayName !== undefined ? patch.displayName.trim() : current.displayName;
+      if (!displayName) throw new ValidationError('Enter a name.');
+      if (displayName.length > 60) throw new ValidationError('Keep the name to 60 characters.');
+      if (patch.timeZone !== undefined) {
+        try {
+          new Intl.DateTimeFormat('en', { timeZone: patch.timeZone });
+        } catch {
+          throw new ValidationError('That time zone is not recognised.');
+        }
+      }
+      const next: Profile = { ...current, ...patch, displayName, updatedAt: this.iso() };
+      await this.db.kv.put({ key: KV.profile, value: next });
+      return next;
+    });
+  }
+
+  // ---------- Backup, restore, reset ----------
+
+  /** A full backup; also records when the last one was made. */
+  async createBackup(): Promise<Backup> {
+    const backup = await exportBackup(this.db, this.now());
+    await this.db.transaction('rw', this.db.kv, async () => {
+      const meta = await this.getMeta();
+      if (meta) await this.db.kv.put({ key: KV.meta, value: { ...meta, lastBackupAt: backup.exportedAt } });
+    });
+    return backup;
+  }
+
+  /**
+   * Restores a validated backup. A snapshot of the current data is kept first
+   * so `undoImport` can put everything back.
+   */
+  async restoreBackup(backup: Backup, mode: ImportMode): Promise<ImportResult> {
+    const snapshot = await exportBackup(this.db, this.now());
+    await this.db.kv.put({ key: KV.preImport, value: snapshot });
+    const result = await importBackup(this.db, backup, mode);
+    await this.repairLedger();
+    return result;
+  }
+
+  async preImportSnapshot(): Promise<Backup | null> {
+    return ((await this.db.kv.get(KV.preImport))?.value as Backup | undefined) ?? null;
+  }
+
+  async undoImport(): Promise<void> {
+    const snapshot = await this.preImportSnapshot();
+    if (!snapshot) throw new ValidationError('There is no import to undo.');
+    await importBackup(this.db, snapshot, 'replace');
+    await this.db.kv.delete(KV.preImport);
+    await this.repairLedger();
+  }
+
+  /** Erases every record on this device, then starts fresh with the original plans. */
+  async eraseAll(): Promise<void> {
+    await this.db.transaction('rw', TABLES.map((t) => this.db.table(t)), async () => {
+      for (const t of TABLES) await this.db.table(t).clear();
+    });
+    await this.ensureInitialized();
+  }
+
   // ---------- Tasks ----------
 
   private async nextRank(date: DateKey | null): Promise<number> {
@@ -239,9 +312,11 @@ export class Repository {
     return task;
   }
 
-  async updateTask(id: ID, patch: TaskPatch): Promise<Task> {
+  /** `baseRevision`, when given, is the revision the edit form started from; a newer stored revision is a conflict. */
+  async updateTask(id: ID, patch: TaskPatch, baseRevision?: number): Promise<Task> {
     return this.db.transaction('rw', this.db.tasks, this.db.entries, this.db.xpEvents, async () => {
       const task = await this.mustGetTask(id);
+      if (baseRevision !== undefined && task.revision !== baseRevision) throw new StaleEditError('task');
       const next: Task = {
         ...task,
         ...patch,
@@ -707,11 +782,13 @@ export class Repository {
     });
   }
 
-  async updateGoal(id: ID, patch: Partial<GoalInput>): Promise<Goal> {
+  /** `baseUpdatedAt`, when given, is the goal's updatedAt when the edit form opened; anything newer is a conflict. */
+  async updateGoal(id: ID, patch: Partial<GoalInput>, baseUpdatedAt?: string): Promise<Goal> {
     return this.db.transaction('rw', this.db.goals, async () => {
       const all = await this.db.goals.toArray();
       const goal = all.find((g) => g.id === id);
       if (!goal) throw new ValidationError('That goal no longer exists.');
+      if (baseUpdatedAt !== undefined && goal.updatedAt !== baseUpdatedAt) throw new StaleEditError('goal');
       const mode = patch.measurementMode ?? goal.measurementMode;
       const next: Goal = {
         ...goal,

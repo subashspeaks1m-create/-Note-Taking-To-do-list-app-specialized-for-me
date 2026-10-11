@@ -276,3 +276,23 @@
     opacity: 0;
   }
 }
+
+/* ---------- Offline / update bar ---------- */
+
+.pwa-bar {
+  position: fixed;
+  left: 50%;
+  top: 14px;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--learning) 45%, transparent);
+  background: #0f1620;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}

@@ -6,7 +6,7 @@ import { Icon } from '../../components/Icon';
 import { LevelRing, Meter } from '../../components/Progress';
 import { useClock } from '../../date/clock';
 import { minutesInZone, type DateKey } from '../../date/localDate';
-import { PLAN_DEFAULTS, PROFILE_DEFAULTS, rankLabel } from '../../domain/config';
+import { PLAN_DEFAULTS, rankLabel } from '../../domain/config';
 import { sprintCountdown } from '../../domain/plans';
 import { useProgressSummary } from '../../domain/progressSummary';
 import { consistency } from '../../domain/stats';
@@ -57,7 +57,7 @@ export function ProfileStrip({ today, collapsed, onToggleCollapsed, timeZone }: 
         <div className="strip__intro">
           <p className="overline">A little progress, every day</p>
           <h1 className="strip__greeting">
-            {greeting}, {PROFILE_DEFAULTS.displayName}.
+            {greeting}, {profile.displayName}.
           </h1>
           {!collapsed && <p className="strip__sub">One clear intention. One real action. A written record of who you're becoming.</p>}
         </div>

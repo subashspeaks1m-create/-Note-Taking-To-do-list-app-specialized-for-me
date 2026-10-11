@@ -14,7 +14,7 @@ import { useProfile } from '../storage/StorageProvider';
 import { useDisplayPrefs } from './displayPrefs';
 
 /** Which build stage this preview shows; the note reappears for each new stage. */
-const PREVIEW_STAGE = 5;
+const PREVIEW_STAGE = 6;
 
 interface Destination {
   to: string;
@@ -60,7 +60,7 @@ export function AppShell() {
         {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
             <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
-            <span>Stage 5: real XP and levels, badges, streak transformations, platforms and reward chests are live. Suit art and 360° clips arrive as you make them.</span>
+            <span>Stage 6: back up and restore your data in Settings, install the app, and use it offline. Two open tabs can no longer overwrite each other.</span>
             <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>
