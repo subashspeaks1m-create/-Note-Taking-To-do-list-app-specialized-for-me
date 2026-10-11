@@ -33,6 +33,10 @@ export function InsightsPage() {
     return views.sort((a, b) => PACE_ORDER.indexOf(a.pace.state) - PACE_ORDER.indexOf(b.pace.state));
   }, [board, today]);
   const goalsBehind = goals.filter((g) => g.pace.state === 'behind').map((g) => g.goal.title);
+  const coachGoals = useMemo(
+    () => goals.map((g) => ({ title: g.goal.title, progress: g.progress.fraction === null ? g.progress.summary || 'not measured yet' : `${Math.round(g.progress.fraction * 100)}% (${g.progress.summary})`, pace: g.pace.label })),
+    [goals],
+  );
 
   const reportKind = tab === 'month' ? 'month' : 'week';
   const fromUrl = params.get('p');
@@ -79,6 +83,7 @@ export function InsightsPage() {
           weekStart={weekStart}
           name={profile.displayName}
           goalsBehind={goalsBehind}
+          coachGoals={coachGoals}
           markSeen={inbox.markSeen}
         />
       )}

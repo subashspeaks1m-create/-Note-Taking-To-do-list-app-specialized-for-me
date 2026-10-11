@@ -6,6 +6,7 @@ import { dayActivity, type DayActivity } from '../domain/intensity';
 import type { ActivitySource } from '../domain/stats';
 import { isOpen } from '../domain/tasks';
 import { useStorage } from './StorageProvider';
+import { coachNoteKey, type CoachNote } from './repo';
 
 /** Live queries: they re-run when the data changes, in this tab or another. */
 
@@ -252,4 +253,10 @@ export function useChestGoals(): ChestGoal[] | undefined {
       .map((goal) => ({ goal, plan: byId.get(goal.planId!)! }))
       .sort((a, b) => Number(b.goal.status === 'achieved') - Number(a.goal.status === 'achieved') || a.plan.endDate.localeCompare(b.plan.endDate) || a.goal.rank - b.goal.rank);
   }, [db]);
+}
+
+/** The AI coach's saved notes for a report period, or null when none were written. */
+export function useCoachNote(kind: 'week' | 'month', start: DateKey): CoachNote | null | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => ((await db.kv.get(coachNoteKey(kind, start)))?.value as CoachNote | undefined) ?? null, [db, kind, start]);
 }

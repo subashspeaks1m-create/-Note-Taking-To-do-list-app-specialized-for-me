@@ -2,6 +2,7 @@ import { useDisplayPrefs, type DisplayPrefs } from '../../app/displayPrefs';
 import { Art } from '../../components/art/Art';
 import { PageHeader } from '../../components/Page';
 import { APP_NAME } from '../../domain/config';
+import { CoachSettings } from './CoachSettings';
 import { DataSettings } from './DataSettings';
 import { InstallSetting } from './InstallSetting';
 import { ProfileSettings } from './ProfileSettings';
@@ -41,6 +42,8 @@ export function SettingsPage() {
         <Choice label="Graphics" prefKey="lowGraphics" options={[{ value: false, label: 'Full' }, { value: true, label: 'Low' }]} />
         <Choice label="Sounds" prefKey="sound" options={[{ value: 'off', label: 'Off' }, { value: 'on', label: 'Soft chimes' }]} />
       </section>
+
+      <CoachSettings />
 
       <InstallSetting />
 

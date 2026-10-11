@@ -3,7 +3,7 @@ import { OUTFITS } from '../domain/wardrobe';
 import { dateKeyInZone, type DateKey } from '../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, RULES_VERSION, type Category, type Effort } from '../domain/config';
 import type {
-  ContentEntry, EarningEntry, EntryKind, Principle, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
+  ContentEntry, EarningEntry, Instant, EntryKind, Principle, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
   Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan, XPEvent,
 } from '../domain/models';
 import { wouldCreateCycle } from '../domain/goals';
@@ -87,6 +87,14 @@ export interface EntryContent {
 export const MAX_REVISIONS_PER_ENTRY = 40;
 /** Autosaves closer together than this update the newest checkpoint instead of adding one. */
 export const CHECKPOINT_INTERVAL_MS = 5 * 60 * 1000;
+
+export interface CoachNote {
+  model: string;
+  text: string;
+  createdAt: Instant;
+}
+
+export const coachNoteKey = (kind: 'week' | 'month', start: DateKey) => `coach:${kind}:${start}`;
 
 const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', wearing: 'wearing', platform: 'platform', principles: 'principles', preImport: 'preImportBackup' } as const;
 
@@ -1005,6 +1013,17 @@ export class Repository {
   async setWearing(outfitId: string): Promise<void> {
     if (!OUTFITS.some((o) => o.id === outfitId)) throw new ValidationError('That outfit is not in the vault.');
     await this.db.kv.put({ key: KV.wearing, value: outfitId });
+  }
+
+  /** The AI coach's notes for one report period, kept with the record (and in backups). */
+  async saveCoachNote(kind: 'week' | 'month', start: DateKey, note: { model: string; text: string }): Promise<void> {
+    const text = note.text.trim().slice(0, 12_000);
+    if (!text) throw new ValidationError('The coach sent back nothing to save.');
+    await this.db.kv.put({ key: coachNoteKey(kind, start), value: { model: note.model, text, createdAt: this.iso() } });
+  }
+
+  async deleteCoachNote(kind: 'week' | 'month', start: DateKey): Promise<void> {
+    await this.db.kv.delete(coachNoteKey(kind, start));
   }
 
   /** The look shown on the platform: a rank form or an unlocked suit. */
