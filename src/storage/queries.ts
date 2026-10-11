@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { DEFAULT_OUTFIT } from '../domain/wardrobe';
 import { compareKeys, type DateKey } from '../date/localDate';
 import type { AchievementUnlock, ContentEntry, CosmeticUnlock, EarningEntry, Goal, Principle, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
 import { dayActivity, type DayActivity } from '../domain/intensity';
@@ -186,6 +187,12 @@ export function useContentLog(): ContentEntry[] | undefined {
 export function contentTotals(log: readonly ContentEntry[]): { posts: number; audience: number } {
   const latest = log.find((e) => e.audience !== null);
   return { posts: log.reduce((sum, e) => sum + e.posts, 0), audience: latest?.audience ?? 0 };
+}
+
+/** The vault outfit worn today (the starter hoodie until one is picked). */
+export function useWearing(): string | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(async () => ((await db.kv.get('wearing'))?.value as string | undefined) ?? DEFAULT_OUTFIT, [db]);
 }
 
 /** The look chosen on the Character page, or null when none was picked. */

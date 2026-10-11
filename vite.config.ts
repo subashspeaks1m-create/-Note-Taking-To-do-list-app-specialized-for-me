@@ -43,6 +43,12 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: { cacheName: 'character-clips', rangeRequests: true, expiration: { maxEntries: 40 } },
           },
+          {
+            // 3D outfit models and the mesh decoder are large, so they are cached the first time they are worn.
+            urlPattern: ({ url }) => url.pathname.endsWith('.glb') || url.pathname.includes('/draco/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'character-models', expiration: { maxEntries: 40 } },
+          },
         ],
       },
     }),

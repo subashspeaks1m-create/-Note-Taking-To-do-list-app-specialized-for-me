@@ -454,3 +454,12 @@ describe('unlocks and chests', () => {
     expect((await db.plans.get(sprint.id))!.finishedAt).toBeTruthy();
   });
 });
+
+describe('vault', () => {
+  it('wears any outfit from the vault and refuses unknown ones', async () => {
+    await repo.setWearing('dark-knight');
+    expect((await db.kv.get('wearing'))?.value).toBe('dark-knight');
+    await expect(repo.setWearing('nope')).rejects.toThrow('not in the vault');
+    expect((await db.kv.get('wearing'))?.value).toBe('dark-knight');
+  });
+});
