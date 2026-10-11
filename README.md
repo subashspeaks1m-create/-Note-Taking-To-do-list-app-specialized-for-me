@@ -11,12 +11,21 @@ no account, server or cloud.
 npm install
 npm run dev          # http://localhost:5173
 npm test             # unit tests
+npm run e2e          # browser checks (starts a dev server and a production preview)
 npm run build        # typecheck + production build in dist/
 npm run build:review # sandbox-friendly build in dist-review/ (in-memory routing, relative assets)
 ```
 
 Development builds accept `?now=2026-12-31T10:00:00+05:30` to simulate another moment for
 checking date boundaries.
+
+Browser checks need a Chromium: `npx playwright install chromium`, or point `PW_CHROMIUM` at one
+you already have. Results, traces and screenshots land in `e2e/.results/`. The pass/fail table for
+every acceptance check, hosting notes and media provenance are in
+[docs/ACCEPTANCE_REPORT.md](docs/ACCEPTANCE_REPORT.md).
+
+Settings has a **demo mode** that fills a separate database with fictional data, with a banner
+while it is on. Your real data, XP and unlocks are never touched.
 
 ## Stack
 
@@ -46,14 +55,20 @@ source-assets  original kit media, kept for provenance, not shipped
 - `scholar.webp`, `builder.webp`, `ascendant.webp`: the kit's generated suit portraits
   (real alpha), resized to 900 px. They are static artwork. In-app motion and owner-made
   video loops arrive in stage 5.
-- SVG icons, badges and stage art, and WAV cues: original kit assets.
+- `public/assets/vault/`: outfit concept pictures from the Vision Full Body kit (static). Real 3D
+  outfits load from `src/assets/models/` once added; until then the Vault shows a stand-in.
+- SVG icons, badges and stage art, and WAV cues: original kit assets. Fluent Emoji art and
+  line-md icons are MIT. See the acceptance report for the full list.
 
 ## Build stages
 
-1. Foundation: shell, Today layout, character stage, empty states (done)
+All seven stages are built.
+
+1. Foundation: shell, Today layout, character stage, empty states
 2. Daily workflow: storage, tasks, journal, autosave
-3. Visions: plans, goals, milestones, period direction
-4. Calendar, Journal, Insights
-5. Game and character: XP ledger, levels, streaks, badges, suits
-6. Reliability and settings: offline PWA, backup/restore, conflicts
-7. Verification: acceptance table, tests, screenshots
+3. Visions: plans, goals, milestones, period direction, daily habits
+4. Calendar, Journal, Insights, weekly and monthly report cards
+5. Game and character: XP ledger, levels, streaks, badges, earnings ranks, equipment, the Vault
+6. Reliability and settings: offline PWA, backup/restore, conflicts, AI weekly coach (free
+   OpenRouter models, key kept in this browser only)
+7. Verification: demo mode, browser checks, screenshots, acceptance report

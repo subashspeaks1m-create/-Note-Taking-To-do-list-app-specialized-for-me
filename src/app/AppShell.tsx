@@ -10,11 +10,12 @@ import { APP_NAME } from '../domain/config';
 import { formatShort } from '../date/localDate';
 import { periodRange } from '../domain/stats';
 import { useReportInbox, type ReportInbox } from '../features/insights/reportInbox';
+import { isDemo, setDemo } from '../storage/demo';
 import { useProfile } from '../storage/StorageProvider';
 import { useDisplayPrefs } from './displayPrefs';
 
 /** Which build stage this preview shows; the note reappears for each new stage. */
-const PREVIEW_STAGE = 6;
+const PREVIEW_STAGE = 7;
 
 interface Destination {
   to: string;
@@ -42,12 +43,11 @@ export function AppShell() {
   const inbox = useReportInbox();
 
   // Move focus to the page on navigation so keyboard and screen-reader users land in the content.
-  const firstRender = useRef(true);
+  // Compared by path (not a first-render flag) so dev StrictMode's double effect doesn't steal focus on load.
+  const lastPath = useRef(location.pathname);
   useEffect(() => {
-    if (firstRender.current) {
-      firstRender.current = false;
-      return;
-    }
+    if (lastPath.current === location.pathname) return;
+    lastPath.current = location.pathname;
     mainRef.current?.focus({ preventScroll: true });
   }, [location.pathname]);
 
@@ -58,10 +58,26 @@ export function AppShell() {
       </a>
       <Rail inbox={inbox} />
       <main id="main" ref={mainRef} tabIndex={-1} className="shell__main">
+        {isDemo() && (
+          <div className="demo-banner" role="note">
+            <strong>Demo mode</strong>
+            <span>Fictional data in a separate database. Your real data, XP and unlocks are untouched.</span>
+            <button
+              type="button"
+              className="btn btn--sm"
+              onClick={() => {
+                setDemo(false);
+                window.location.reload();
+              }}
+            >
+              Exit demo
+            </button>
+          </div>
+        )}
         {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
             <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
-            <span>Stage 6: back up and restore your data in Settings, install the app, and use it offline. Two open tabs can no longer overwrite each other.</span>
+            <span>Stage 7: an AI coach writes notes on your weekly report (add your OpenRouter key in Settings), demo mode lives in Settings, and every acceptance check has been run.</span>
             <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>

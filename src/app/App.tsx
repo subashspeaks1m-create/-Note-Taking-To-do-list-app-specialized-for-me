@@ -18,6 +18,8 @@ import { TodayPage } from '../features/today/TodayPage';
 import { GoalPage } from '../features/visions/GoalPage';
 import { PlanPage } from '../features/visions/PlanPage';
 import { VisionsPage } from '../features/visions/VisionsPage';
+import { REAL_DB_NAME } from '../storage/db';
+import { DEMO_DB_NAME, isDemo } from '../storage/demo';
 import { StorageProvider } from '../storage/StorageProvider';
 import { AppShell } from './AppShell';
 import { DisplayPrefsProvider } from './displayPrefs';
@@ -57,7 +59,7 @@ export function App() {
   return (
     <ClockProvider>
       <DisplayPrefsProvider>
-        <StorageProvider>
+        <StorageProvider dbName={isDemo() ? DEMO_DB_NAME : REAL_DB_NAME}>
           <ToastProvider>
             <RouterProvider router={router} />
             {PwaUpdater && (

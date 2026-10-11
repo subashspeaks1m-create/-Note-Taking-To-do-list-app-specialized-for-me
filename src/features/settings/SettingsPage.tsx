@@ -4,6 +4,7 @@ import { PageHeader } from '../../components/Page';
 import { APP_NAME } from '../../domain/config';
 import { CoachSettings } from './CoachSettings';
 import { DataSettings } from './DataSettings';
+import { DemoSetting } from './DemoSetting';
 import { InstallSetting } from './InstallSetting';
 import { ProfileSettings } from './ProfileSettings';
 
@@ -48,6 +49,8 @@ export function SettingsPage() {
       <InstallSetting />
 
       <DataSettings />
+
+      <DemoSetting />
 
       <section className="settings-group" aria-labelledby="sg-credits">
         <h2 id="sg-credits" className="settings-group__title">

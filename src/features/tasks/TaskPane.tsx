@@ -424,7 +424,7 @@ export function TaskPane({ date, today, relation, timeZone, loggedTaskIds, onWri
             ) : (
               <>
                 <p className="empty__title">{relation === 'future' ? 'Plan what you will learn or do.' : relation === 'past' ? 'No tasks were planned for this day.' : 'What will you learn or do today?'}</p>
-                <p className="empty__body">Keep each task to one line. Write the full story on the right after you do it. Paste several lines to add them all at once.</p>
+                <p className="empty__body">Keep each task to one line. Write the full story under "What happened" after you do it. Paste several lines to add them all at once.</p>
               </>
             )}
           </div>

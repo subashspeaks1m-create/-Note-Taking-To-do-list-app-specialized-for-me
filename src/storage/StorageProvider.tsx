@@ -4,6 +4,7 @@ import { useClock } from '../date/clock';
 import { PROFILE_DEFAULTS } from '../domain/config';
 import type { Profile } from '../domain/models';
 import { AppDatabase, REAL_DB_NAME } from './db';
+import { DEMO_DB_NAME, seedDemo } from './demo';
 import { Repository } from './repo';
 
 interface StorageCtx {
@@ -31,6 +32,7 @@ export function StorageProvider({ children, dbName = REAL_DB_NAME }: { children:
     let cancelled = false;
     repo
       .ensureInitialized()
+      .then(() => (dbName === DEMO_DB_NAME ? seedDemo(db, clock.now()) : undefined))
       .then(() => repo.repairLedger())
       .then(() => !cancelled && setBoot({ status: 'ready' }))
       .catch((e: unknown) => {
@@ -47,7 +49,7 @@ export function StorageProvider({ children, dbName = REAL_DB_NAME }: { children:
     return () => {
       cancelled = true;
     };
-  }, [repo]);
+  }, [repo, db, dbName, clock]);
 
   const storedProfile = useLiveQuery(async () => (boot.status === 'ready' ? repo.getProfile() : undefined), [repo, boot.status]);
   const value = useMemo(() => {
