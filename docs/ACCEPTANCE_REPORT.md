@@ -3,7 +3,7 @@
 Checked against the kit's `docs/ACCEPTANCE.md` (32 checks) on 2026-10-11.
 Every result below comes from a test that was actually run, named so it can be re-run.
 
-- **Browser checks** (Playwright, Chromium 141, Asia/Kolkata, clock fixed to Oct 10 2026 10:00 unless noted): `npm run e2e`. 42 tests in 7 files in `e2e/`, all passing in one full run (about 12 minutes).
+- **Browser checks** (Playwright, Chromium 141, Asia/Kolkata, clock fixed to Oct 10 2026 10:00 unless noted): `npm run e2e`. 43 tests in 7 files in `e2e/`, all passing in one full run (about 15 minutes).
 - **Unit checks** (Vitest + fake IndexedDB): `npm test`. 174 tests in 20 files.
 - **Build checks**: `npm run build` (runs `tsc -b`), `npx eslint .`.
 
@@ -53,7 +53,7 @@ Result: **29 pass, 3 pass with a noted gap, 0 fail.** One check (#22) was change
 
 ## Known limitations
 
-- **Real 3D outfits:** the Vault shows a simple stand-in until your GLB file is added (`src/assets/models/<id>.glb` or one layered `subash-wardrobe.glb`).
+- **3D model:** your Blender wardrobe is in the Vault and on the Character page (see `docs/3D_MODEL.md`). Likeness is approximate, and phone frame rate hasn't been measured on a real device.
 - **Video codec:** the test browser (open-source Chromium) can't play H.264, so playback rules were tested with a VP9 copy of the same loop (`e2e/fixtures/portrait-test.webm`). Chrome, Edge and Safari play the MP4; a browser without H.264 shows the still frame.
 - **AI coach:** tested against a stand-in for OpenRouter, never with a real key. Free models come and go; "Best free model" tries several and then OpenRouter's live free list.
 - **Not tested:** iPhone Safari, Firefox, real screen readers, real installs to a home screen.
@@ -74,7 +74,8 @@ React 19.3, React Router 7.18, Dexie 4.4 (+ dexie-react-hooks 4.4), TipTap 3.31,
 ## Media provenance
 
 - `public/assets/character/`: your supplied character video (scaled, looped forward and back) and its still frames; Scholar, Builder and Ascendant portraits from the Ascend kit (generated, static).
-- `public/assets/vault/`: outfit concept pictures from the Vision Full Body kit's generated reference art (static).
+- `public/assets/vault/`: outfit concept pictures from the Vision Full Body kit's generated reference art, plus six renders of the 3D model from the Realism Wardrobe v6 kit (static).
+- `src/assets/models/subash-wardrobe.glb`: web copy of the Realism Wardrobe v6 Blender file; MakeHuman/MPFB (CC0), Elvaerwyn (CC-BY), credits in `docs/3D_MODEL.md`.
 - `public/assets/art/`: Microsoft Fluent Emoji (MIT). Self-drawing nav icons: line-md 1.2.16 (MIT).
 - `public/assets/ui/`, `public/assets/audio/`: original Ascend kit assets. The WAV cues are shipped but the app's chimes are synthesized in code and off by default.
 - `e2e/fixtures/portrait-test.webm`: a 3-second VP9 copy of the character loop, for tests only.

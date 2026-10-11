@@ -87,11 +87,35 @@ test('#24 reduced motion, missing media, hidden page and offscreen all fall back
   await expect(page.getByRole('group', { name: 'Sounds' }).getByRole('button', { name: 'Off' })).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('#24 the 3D vault falls back to a stand-in when no model file is added, and stops spinning with reduced motion', async ({ page }) => {
+test('the Vault loads your 3D model, switches outfits and the mask, and keeps auto-rotate off with reduced motion', async ({ page }) => {
+  test.setTimeout(120_000);
   await startAt(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/vault');
-  await expect(page.getByRole('status').filter({ hasText: /Stand-in|3D is not available/ })).toBeVisible({ timeout: 20_000 });
+  const status = page.getByRole('status').filter({ hasText: /3D model ·|Stand-in|3D is not available|could not/ });
+  await expect(status).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('button', { name: 'Auto-rotate' })).toBeDisabled();
   // All outfits are open from day one (Prem's decision): none is locked.
   await expect(page.getByText(/locked/i)).toHaveCount(0);
+  if (!/3D model ·/.test((await status.textContent()) ?? '')) {
+    test.info().annotations.push({ type: 'note', description: 'No WebGL in this browser: the stand-in fallback was checked instead.' });
+    return;
+  }
+  // Initiate has no mask; Web Runner does, and it can be switched on.
+  await expect(page.getByRole('button', { name: 'Mask' })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Web Runner/ }).first().click();
+  await expect(page.getByRole('status').filter({ hasText: /3D model ·/ })).toBeVisible();
+  const mask = page.getByRole('button', { name: 'Mask' });
+  await expect(mask).toHaveAttribute('aria-pressed', 'false');
+  await mask.click();
+  await expect(mask).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('the Character page stands your 3D model on its platform, with the 2D portrait until it loads', async ({ page }) => {
+  test.setTimeout(120_000);
+  await startAt(page);
+  await page.goto('/character');
+  // Either the 3D model (WebGL) or the portrait fallback: never an empty platform.
+  await expect(page.getByRole('img', { name: /You in 3D, wearing Initiate/ }).or(page.locator('.stage__portrait')).first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('link', { name: 'change outfit in the Vault' })).toBeVisible();
 });

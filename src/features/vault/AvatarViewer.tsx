@@ -7,6 +7,7 @@ export interface ViewerHandle {
   view: (deg: number) => void;
   rotateBy: (deg: number) => void;
   fit: () => void;
+  face: () => void;
 }
 
 interface Props {
@@ -14,13 +15,15 @@ interface Props {
   accent: string;
   autoRotate: boolean;
   reducedMotion: boolean;
+  /** Helmet, mask or cowl on, for outfits that have one. */
+  helmet?: boolean;
   /** Must be stable (a state setter): the engine is created once with it. */
   onStatus: (s: ViewerStatus | { state: 'no-webgl' }) => void;
   ref?: Ref<ViewerHandle>;
 }
 
 /** The WebGL chamber. Owns one engine for its lifetime and swaps outfits inside it. */
-export function AvatarViewer({ outfit, accent, autoRotate, reducedMotion, onStatus, ref }: Props) {
+export function AvatarViewer({ outfit, accent, autoRotate, reducedMotion, helmet = false, onStatus, ref }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<ViewerEngine | null>(null);
 
@@ -43,6 +46,7 @@ export function AvatarViewer({ outfit, accent, autoRotate, reducedMotion, onStat
     void engine.current?.show(modelSource(outfit.id), outfit.colors);
   }, [outfit]);
 
+  useEffect(() => engine.current?.setHelmet(helmet), [helmet]);
   useEffect(() => engine.current?.setAccent(accent), [accent]);
   useEffect(() => engine.current?.setMotion({ autoRotate: autoRotate && !reducedMotion, reducedMotion }), [autoRotate, reducedMotion]);
 
@@ -50,6 +54,7 @@ export function AvatarViewer({ outfit, accent, autoRotate, reducedMotion, onStat
     view: (deg) => engine.current?.view(deg),
     rotateBy: (deg) => engine.current?.rotateBy(deg),
     fit: () => engine.current?.fit(),
+    face: () => engine.current?.face(),
   }));
 
   return <div ref={host} className="viewer" />;

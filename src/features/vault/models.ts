@@ -24,5 +24,11 @@ export function modelSource(outfitId: string, layeredOutfits: ReadonlySet<string
   return null;
 }
 
-/** Concept pictures exist for these outfits (the rest show a color swatch). */
-export const THUMBS = new Set(['initiate', 'golden-streetwear', 'city-athlete', 'tropical-runner', 'web-runner', 'showman', 'flame-rider', 'symbiote']);
+/** Pictures exist for these outfits (anything else shows a color swatch). */
+export const THUMBS = new Set([
+  'initiate', 'golden-streetwear', 'city-athlete', 'tropical-runner', 'web-runner', 'showman', 'flame-rider', 'symbiote',
+  'mercenary', 'sorcerer', 'thunder-lord', 'arc-armor', 'mech-arms', 'dark-knight',
+]);
+
+/** These pictures are renders of the 3D model itself (no concept art was made for them). */
+export const RENDERED_THUMBS = new Set(['mercenary', 'sorcerer', 'thunder-lord', 'arc-armor', 'mech-arms', 'dark-knight']);
