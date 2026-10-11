@@ -767,3 +767,117 @@
 .setting__value {
   color: var(--muted);
 }
+
+/* ---------- Settings: profile and data ---------- */
+
+.settings-group__lede {
+  margin-bottom: 8px;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.setting__help {
+  display: block;
+  max-width: 46ch;
+  margin-top: 2px;
+  font-weight: 400;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.setting__help--warn {
+  color: var(--gold);
+}
+
+.setting__label {
+  flex: 1 1 240px;
+}
+
+.setting__inline .input,
+.setting__select {
+  width: min(280px, 100%);
+}
+
+.setting .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.restore {
+  display: grid;
+  gap: 12px;
+}
+
+.restore__meta,
+.restore__safe {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.restore__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.restore__table th,
+.restore__table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-quiet);
+}
+
+.restore__table th {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.restore__table td + td,
+.restore__table th + th {
+  text-align: right;
+}
+
+.restore__list {
+  padding-left: 18px;
+  list-style: disc;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.restore__list--bad {
+  margin-top: 8px;
+  color: var(--danger, #ff8a8a);
+}
+
+.restore__modes {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+}
+
+.restore__mode {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-quiet);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.restore__mode.is-on {
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
+  background: rgb(255 214 120 / 0.05);
+}
+
+.restore__mode input {
+  margin-top: 3px;
+}
+
+.erase {
+  display: grid;
+  gap: 14px;
+}

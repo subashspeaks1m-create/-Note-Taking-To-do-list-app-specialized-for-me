@@ -41,6 +41,7 @@ const PATHS = {
     </>
   ),
   plus: <path d="M12 4V20M4 12H20" />,
+  download: <path d="M12 4V15M7 10.5 12 15.5 17 10.5M5 19H19" />,
   principles: <path d="M12 3 14.4 8.8 20.6 9.3 15.9 13.3 17.3 19.4 12 16.1 6.7 19.4 8.1 13.3 3.4 9.3 9.6 8.8Z" />,
   settings: (
     <>
