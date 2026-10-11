@@ -72,7 +72,7 @@
   min-height: 0;
 }
 .vault-search { position: relative; display: block; }
-.vault-search .icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.vault-search > svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .vault-search .input { padding-left: 32px; width: 100%; }
 .vault-filters { display: flex; gap: 6px; }
 .vault-filter {
