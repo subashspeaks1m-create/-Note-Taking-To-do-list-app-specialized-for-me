@@ -15,6 +15,7 @@ export const BACKUP_FORMAT_VERSION = 1;
 export const TABLES = [
   'kv', 'plans', 'goals', 'milestones', 'goalUpdates', 'periodDirections', 'taskSeries', 'tasks', 'taskMoves',
   'entries', 'entryRevisions', 'xpEvents', 'achievements', 'cosmetics', 'earnings',
+  'contentLog',
 ] as const;
 export type TableName = (typeof TABLES)[number];
 
@@ -34,6 +35,7 @@ export const TABLE_LABEL: Record<TableName, string> = {
   achievements: 'Badges',
   cosmetics: 'Unlocks',
   earnings: 'Earnings',
+  contentLog: 'Content log',
 };
 
 type Row = Record<string, unknown>;
@@ -98,6 +100,10 @@ const RULES: Partial<Record<TableName, (r: Row) => string | null>> = {
   achievements: (r) => (!str(r.achievementId) ? 'achievementId' : null),
   cosmetics: (r) => (!str(r.cosmeticId) ? 'cosmeticId' : null),
   earnings: (r) => (!num(r.amount) || (r.amount as number) <= 0 ? 'amount' : !isDateKey(r.dateKey as string) ? 'dateKey' : null),
+  contentLog: (r) =>
+    !isDateKey(r.dateKey as string) ? 'dateKey'
+      : !num(r.posts) || (r.posts as number) < 0 ? 'posts'
+        : r.audience != null && (!num(r.audience) || (r.audience as number) < 0) ? 'audience' : null,
   goalUpdates: (r) => (!str(r.goalId) ? 'goalId' : null),
   taskMoves: (r) => (!str(r.taskId) ? 'taskId' : null),
   periodDirections: (r) => (!['day', 'week', 'month'].includes(r.kind as string) ? 'kind' : !str(r.periodKey) ? 'periodKey' : null),

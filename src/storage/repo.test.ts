@@ -145,6 +145,20 @@ describe('two open tabs', () => {
   });
 });
 
+describe('content log', () => {
+  it('logs posts and audience, refuses empty or negative lines, and deletes with undo', async () => {
+    const a = await repo.addContent({ dateKey: '2026-10-09', posts: 2, audience: 900 });
+    await repo.addContent({ dateKey: '2026-10-10', posts: 1, note: 'YouTube' });
+    await expect(repo.addContent({ dateKey: '2026-10-10', posts: 0 })).rejects.toThrow(/posts/i);
+    await expect(repo.addContent({ dateKey: '2026-10-10', posts: -1 })).rejects.toThrow(/negative/);
+    expect(await db.contentLog.count()).toBe(2);
+    await repo.deleteContent(a.id);
+    expect((await db.contentLog.get(a.id))!.deletedAt).not.toBeNull();
+    await repo.restoreContent(a.id);
+    expect((await db.contentLog.get(a.id))!.deletedAt).toBeNull();
+  });
+});
+
 describe('journal', () => {
   it('saves content and survives a fresh connection', async () => {
     const e = await repo.createEntry({ dateKey: '2026-10-10', kind: 'learning', timeZone: TZ });

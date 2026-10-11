@@ -2,7 +2,7 @@ import type { JSONContent } from '@tiptap/core';
 import { dateKeyInZone, type DateKey } from '../date/localDate';
 import { PLAN_DEFAULTS, PROFILE_DEFAULTS, RULES_VERSION, type Category, type Effort } from '../domain/config';
 import type {
-  EarningEntry, EntryKind, Principle, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
+  ContentEntry, EarningEntry, EntryKind, Principle, EntryRevision, Goal, GoalStatus, ID, JournalEntry, MeasurementMode, Milestone, PeriodDirection,
   Priority, Profile, RecurrenceRule, SchemaMeta, Task, TaskMove, TaskSeries, TaskStatus, VisionPlan, XPEvent,
 } from '../domain/models';
 import { wouldCreateCycle } from '../domain/goals';
@@ -973,6 +973,31 @@ export class Repository {
 
   async restoreEarning(id: ID): Promise<void> {
     await this.db.earnings.update(id, { deletedAt: null, updatedAt: this.iso() });
+  }
+
+  // ---------- Content log ----------
+
+  /** Posts published on a day and, optionally, the audience size then. At least one is needed. */
+  async addContent(input: { dateKey: DateKey; posts: number; audience?: number | null; note?: string }): Promise<ContentEntry> {
+    const posts = Math.round(input.posts || 0);
+    const audience = input.audience == null || Number.isNaN(input.audience) ? null : Math.round(input.audience);
+    if (!Number.isFinite(posts) || posts < 0) throw new ValidationError('Posts cannot be negative.');
+    if (posts > 100_000) throw new ValidationError('That is too many posts for one entry.');
+    if (audience !== null && (!Number.isFinite(audience) || audience < 0 || audience > 1e10)) throw new ValidationError('Enter a real audience number.');
+    if (posts === 0 && audience === null) throw new ValidationError('Enter posts published, your audience size, or both.');
+    const at = this.iso();
+    const entry: ContentEntry = { id: uuid(), dateKey: input.dateKey, posts, audience, note: (input.note ?? '').trim().slice(0, 200), createdAt: at, updatedAt: at, deletedAt: null };
+    await this.db.contentLog.add(entry);
+    return entry;
+  }
+
+  async deleteContent(id: ID): Promise<void> {
+    const at = this.iso();
+    await this.db.contentLog.update(id, { deletedAt: at, updatedAt: at });
+  }
+
+  async restoreContent(id: ID): Promise<void> {
+    await this.db.contentLog.update(id, { deletedAt: null, updatedAt: this.iso() });
   }
 
   /** The look shown on the platform: a rank form or an unlocked suit. */

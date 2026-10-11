@@ -1,6 +1,8 @@
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from 'react';
 import { useReducedMotion } from '../../app/displayPrefs';
+import { Art } from '../../components/art/Art';
 import type { Look } from '../../domain/character';
+import type { GearState } from '../../domain/equipment';
 import { CharacterPortrait } from './CharacterPortrait';
 import { Silhouette } from './Silhouette';
 
@@ -22,13 +24,16 @@ interface StageProps {
   platform?: string;
   /** Streak transformation aura; dimmed while the streak is below its length. */
   aura?: { id: string; lit: boolean } | null;
+  /** Gear that orbits the platform; slots with nothing yet are left out. */
+  gear?: GearState[];
 }
 
-export function CharacterStage({ look, label, platform = 'base', aura = null }: StageProps) {
+export function CharacterStage({ look, label, platform = 'base', aura = null, gear = [] }: StageProps) {
   const reduced = useReducedMotion();
   const discRef = useRef<HTMLDivElement>(null);
   const figureRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const orbitRef = useRef<HTMLDivElement>(null);
   const angle = useRef(0);
   const drag = useRef<{ x: number; start: number } | null>(null);
   const lastTouch = useRef(0);
@@ -43,6 +48,19 @@ export function CharacterStage({ look, label, platform = 'base', aura = null }: 
         if (Math.abs(video.currentTime - t) > 0.02) video.currentTime = t;
       } else if (figureRef.current) {
         figureRef.current.style.transform = `rotateY(${Math.sin((a * Math.PI) / 180) * 9}deg)`;
+      }
+      // Gear circles the platform with it: front pieces pass in front of him, back ones behind.
+      const orbs = orbitRef.current?.children;
+      if (orbs) {
+        for (let i = 0; i < orbs.length; i++) {
+          const el = orbs[i] as HTMLElement;
+          const th = ((a + (i * 360) / orbs.length) * Math.PI) / 180;
+          const depth = Math.cos(th);
+          el.style.setProperty('--ox', Math.sin(th).toFixed(4));
+          el.style.setProperty('--oy', depth.toFixed(4));
+          el.style.setProperty('--os', (0.78 + 0.22 * depth).toFixed(3));
+          el.style.zIndex = depth > 0 ? '3' : '1';
+        }
       }
     };
     let raf = 0;
@@ -121,6 +139,18 @@ export function CharacterStage({ look, label, platform = 'base', aura = null }: 
         </div>
         <div className="stage__rim" />
       </div>
+
+      {gear.some((g) => g.current) && (
+        <div ref={orbitRef} className="stage__orbit" aria-hidden="true">
+          {gear
+            .filter((g) => g.current)
+            .map((g) => (
+              <span key={g.slot.id} className={`orb orb--${g.slot.tone} orb--t${g.tier}`}>
+                <Art name={g.current!.art} size={40} motion="float" />
+              </span>
+            ))}
+        </div>
+      )}
 
       <div key={look.id} className="stage__figure-wrap">
         {aura && <span className={`stage__aura aura--${aura.id} ${aura.lit ? '' : 'aura--dim'}`} aria-hidden="true" />}

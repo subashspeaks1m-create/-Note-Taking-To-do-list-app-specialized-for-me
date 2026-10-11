@@ -6,7 +6,10 @@ export type ArtName =
   | '1st-place-medal' | 'books' | 'bow-and-arrow' | 'bullseye' | 'chart-increasing' | 'compass' | 'crossed-swords'
   | 'crown' | 'crystal-ball' | 'fire' | 'gear' | 'gem-stone' | 'glowing-star' | 'high-voltage' | 'hourglass-done'
   | 'party-popper' | 'rocket' | 'scroll' | 'seedling' | 'shield' | 'sparkles' | 'spiral-calendar' | 'sunrise'
-  | 'trophy' | 'warning' | 'wrapped-gift' | 'writing-hand';
+  | 'trophy' | 'warning' | 'wrapped-gift' | 'writing-hand'
+  // Equipment
+  | 'notebook' | 'open-book' | 'hammer-and-wrench' | 'toolbox' | 'mechanical-arm' | 'candle' | 'nazar-amulet'
+  | 'mobile-phone' | 'camera' | 'movie-camera' | 'studio-microphone' | 'satellite-antenna' | 'coin' | 'watch' | 'money-bag' | 'ring';
 
 /**
  * How the art moves when it, or the nearest `.art-host`, is hovered.
