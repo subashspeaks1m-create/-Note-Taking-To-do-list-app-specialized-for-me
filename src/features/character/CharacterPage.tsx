@@ -18,6 +18,7 @@ import { useChestGoals, useEarnings, useOutfit, usePlatform } from '../../storag
 import { useProfile, useRepo } from '../../storage/StorageProvider';
 import { CharacterStage } from './CharacterStage';
 import { ChestCard, PlatformSwatch } from './Chests';
+import { ContentForm, ContentLog, EquipmentGrid } from './Equipment';
 import { Silhouette } from './Silhouette';
 import { useGameState, type GameState } from './useGame';
 
@@ -84,6 +85,7 @@ export function CharacterPage() {
             look={shown}
             platform={platformId}
             aura={tf.earned ? { id: tf.earned.id, lit: tf.lit } : null}
+            gear={game.gear}
             label={`${shown.name}${previewing ? ', trying on' : ', equipped'}`}
           />
           <span className="chamber__equipped">
@@ -152,6 +154,13 @@ export function CharacterPage() {
           <p className="chamber__fine">Only money you log counts. Suits, forms and badges you earn from habits are never taken away.</p>
         </div>
       </section>
+
+      <h2 className="section-title">Equipment</h2>
+      <p className="section-sub">
+        Five pieces of gear that upgrade from your real numbers and orbit your platform. Each has five levels.
+      </p>
+      <EquipmentGrid gear={game.gear} />
+      <ContentForm today={today} />
 
       <h2 className="section-title">Transformations</h2>
       <p className="section-sub">
@@ -223,6 +232,7 @@ export function CharacterPage() {
       )}
 
       <EarningsLog />
+      <ContentLog />
 
       <h2 className="section-title">Badges</h2>
       <ul className="badges">

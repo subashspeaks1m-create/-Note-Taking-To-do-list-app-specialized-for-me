@@ -267,6 +267,20 @@ export interface Principle {
 }
 
 /** Money earned, logged by hand. Lifetime total drives the character's rank form. */
+/** One line in the content log: posts published that day and, optionally, the audience size then. */
+export interface ContentEntry {
+  id: ID;
+  dateKey: DateKey;
+  /** Posts, videos or articles published. */
+  posts: number;
+  /** Total followers or subscribers at the time, when logged. */
+  audience: number | null;
+  note: string;
+  createdAt: Instant;
+  updatedAt: Instant;
+  deletedAt: Instant | null;
+}
+
 export interface EarningEntry {
   id: ID;
   /** Local day the money came in. */

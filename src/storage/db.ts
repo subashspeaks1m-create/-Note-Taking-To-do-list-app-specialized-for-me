@@ -1,10 +1,10 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type {
-  AchievementUnlock, CosmeticUnlock, EarningEntry, EntryRevision, Goal, GoalUpdate, JournalEntry, KeyValue, Milestone, PeriodDirection,
+  AchievementUnlock, ContentEntry, CosmeticUnlock, EarningEntry, EntryRevision, Goal, GoalUpdate, JournalEntry, KeyValue, Milestone, PeriodDirection,
   Task, TaskMove, TaskSeries, VisionPlan, XPEvent,
 } from '../domain/models';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * IndexedDB schema. Every table the product needs is declared from version 1
@@ -27,6 +27,7 @@ export class AppDatabase extends Dexie {
   achievements!: EntityTable<AchievementUnlock, 'id'>;
   cosmetics!: EntityTable<CosmeticUnlock, 'id'>;
   earnings!: EntityTable<EarningEntry, 'id'>;
+  contentLog!: EntityTable<ContentEntry, 'id'>;
 
   constructor(name: string) {
     super(name);
@@ -60,6 +61,10 @@ export class AppDatabase extends Dexie {
     // Stage 5: the earnings log behind the character's rank forms.
     this.version(3).stores({
       earnings: 'id, dateKey',
+    });
+    // Equipment: posts and audience behind the Content gear.
+    this.version(4).stores({
+      contentLog: 'id, dateKey',
     });
   }
 }

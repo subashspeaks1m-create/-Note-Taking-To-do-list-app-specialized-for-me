@@ -1,4 +1,5 @@
 import { compareKeys, type DateKey } from '../date/localDate';
+import { gearByCosmeticId } from './equipment';
 import { ALL_LOOKS, type CharacterStats, type Look } from './character';
 import { BADGES, type BadgeId } from './config';
 import type { ID, JournalEntry, Milestone, PeriodDirection, Task, VisionPlan } from './models';
@@ -150,7 +151,7 @@ export function transformationState(bestStreak: number, currentStreak: number): 
 
 export interface RevealItem {
   key: string;
-  kind: 'badge' | 'look' | 'transformation' | 'platform';
+  kind: 'badge' | 'look' | 'transformation' | 'platform' | 'gear';
   title: string;
   detail: string;
   art: string;
@@ -158,6 +159,11 @@ export interface RevealItem {
 
 /** Copy for the unlock reveal: what was earned and the action that earned it. */
 export function revealFor(id: string): RevealItem | null {
+  const gear = gearByCosmeticId(id);
+  if (gear) {
+    const { slot, tier, level } = gear;
+    return { key: id, kind: 'gear', title: `${slot.name} gear: ${tier.name}`, detail: `Level ${level} of 5, reached at ${slot.unit(tier.at)}. It now orbits your platform.`, art: tier.art };
+  }
   const [kind, raw] = id.includes(':') ? (id.split(':') as [string, string]) : ['badge', id];
   if (kind === 'badge') {
     const b = BADGES.find((x) => x.id === raw);

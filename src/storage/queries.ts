@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { compareKeys, type DateKey } from '../date/localDate';
-import type { AchievementUnlock, CosmeticUnlock, EarningEntry, Goal, Principle, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
+import type { AchievementUnlock, ContentEntry, CosmeticUnlock, EarningEntry, Goal, Principle, GoalUpdate, ID, JournalEntry, Milestone, PeriodDirection, Task, TaskSeries, VisionPlan } from '../domain/models';
 import { dayActivity, type DayActivity } from '../domain/intensity';
 import type { ActivitySource } from '../domain/stats';
 import { isOpen } from '../domain/tasks';
@@ -171,6 +171,21 @@ export function useEarnings(): EarningEntry[] | undefined {
     async () => (await db.earnings.filter((e) => !e.deletedAt).toArray()).sort((a, b) => b.dateKey.localeCompare(a.dateKey) || b.createdAt.localeCompare(a.createdAt)),
     [db],
   );
+}
+
+/** Content log, newest first, without deleted lines. */
+export function useContentLog(): ContentEntry[] | undefined {
+  const { db } = useStorage();
+  return useLiveQuery(
+    async () => (await db.contentLog.filter((e) => !e.deletedAt).toArray()).sort((a, b) => b.dateKey.localeCompare(a.dateKey) || b.createdAt.localeCompare(a.createdAt)),
+    [db],
+  );
+}
+
+/** Total posts, and the most recent audience size logged (0 when none). */
+export function contentTotals(log: readonly ContentEntry[]): { posts: number; audience: number } {
+  const latest = log.find((e) => e.audience !== null);
+  return { posts: log.reduce((sum, e) => sum + e.posts, 0), audience: latest?.audience ?? 0 };
 }
 
 /** The look chosen on the Character page, or null when none was picked. */
