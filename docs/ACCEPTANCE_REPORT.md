@@ -3,7 +3,7 @@
 Checked against the kit's `docs/ACCEPTANCE.md` (32 checks) on 2026-10-11.
 Every result below comes from a test that was actually run, named so it can be re-run.
 
-- **Browser checks** (Playwright, Chromium 141, Asia/Kolkata, clock fixed to Oct 10 2026 10:00 unless noted): `npm run e2e`. Files in `e2e/`.
+- **Browser checks** (Playwright, Chromium 141, Asia/Kolkata, clock fixed to Oct 10 2026 10:00 unless noted): `npm run e2e`. 42 tests in 7 files in `e2e/`, all passing in one full run (about 12 minutes).
 - **Unit checks** (Vitest + fake IndexedDB): `npm test`. 174 tests in 20 files.
 - **Build checks**: `npm run build` (runs `tsc -b`), `npx eslint .`.
 
