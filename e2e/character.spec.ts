@@ -123,6 +123,13 @@ test("you stand on the platform as a picture in today's outfit, turn with the pl
   await expect.poll(() => figure.locator('img.is-on').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await expect(page.getByRole('link', { name: 'change outfit in the Vault' })).toBeVisible();
 
+  // Every outfit is listed on the Character page too; tapping one tries it on, and it can be worn from there.
+  await expect(page.locator('.outfit-card')).toHaveCount(15);
+  await page.locator('.outfit-card').filter({ hasText: 'Showman' }).getByRole('button').click();
+  await expect(figure).toHaveAttribute('data-outfit', 'showman');
+  await page.getByRole('button', { name: 'Wear today' }).click();
+  await expect(page.locator('.outfit-card.is-worn')).toContainText('Showman');
+
   // An outfit without its picture yet shows your outline, clearly labeled.
   await page.goto('/vault');
   await page.getByRole('button', { name: /^Mercenary/ }).first().click();
