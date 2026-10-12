@@ -5,10 +5,10 @@ import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toasts';
 import { useTodayKey } from '../../date/clock';
-import { dateKeyInZone, diffDays, formatMedium } from '../../date/localDate';
+import { dateKeyInZone, diffDays, formatMedium, formatTimeInZone } from '../../date/localDate';
 import type { SchemaMeta } from '../../domain/models';
 import { backupFileName, parseBackupText, previewImport, TABLE_LABEL, TABLES, type Backup, type ImportMode, type ImportPreview, type Validation } from '../../storage/backup';
-import { useProfile, useRepo, useStorage } from '../../storage/StorageProvider';
+import { useCloudStatus, useProfile, useRepo, useStorage } from '../../storage/StorageProvider';
 import { downloadText } from '../journal/journalParts';
 
 const BACKUP_NUDGE_DAYS = 7;
@@ -77,13 +77,35 @@ export function DataSettings() {
   };
 
   const persistence = meta?.persistence ?? 'not-requested';
+  const cloud = useCloudStatus();
 
   return (
     <section className="settings-group" aria-labelledby="sg-data">
       <h2 id="sg-data" className="settings-group__title">
         Your data
       </h2>
-      <p className="settings-group__lede">Everything lives in this browser on this device. Nothing is sent anywhere. A backup file is how you move it or keep it safe.</p>
+      <p className="settings-group__lede">
+        {cloud.state === 'off'
+          ? 'Everything lives in this browser on this device. Nothing is sent anywhere. A backup file is how you move it or keep it safe.'
+          : 'Everything is kept in this browser and saved to your Claude account after every change, privately (only you can see it). Opening the app on another device brings it all back. The OpenRouter key stays in this browser only.'}
+      </p>
+
+      {cloud.state !== 'off' && (
+        <div className="setting">
+          <span className="setting__label">
+            Account copy
+            <span className={`setting__help ${cloud.state === 'error' || cloud.state === 'unavailable' ? 'setting__help--warn' : ''}`}>
+              {cloud.state === 'saved'
+                ? `Up to date. Last saved ${formatMedium(dateKeyInZone(new Date(cloud.at), profile.timeZone))} at ${formatTimeInZone(new Date(cloud.at), profile.timeZone)}.`
+                : cloud.state === 'saving'
+                  ? 'Saving…'
+                  : cloud.state === 'error'
+                    ? cloud.message
+                    : 'Could not reach your account in this view. Changes are only in this browser until it reconnects.'}
+            </span>
+          </span>
+        </div>
+      )}
 
       <div className="setting">
         <span className="setting__label">

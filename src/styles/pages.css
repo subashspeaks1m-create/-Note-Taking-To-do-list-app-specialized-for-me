@@ -925,6 +925,26 @@
 .coach__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .coach__error { margin: 8px 0 0; font-size: var(--text-sm); color: var(--warning); }
 
+/* ---------- Account sync ---------- */
+.cloud-note {
+  margin: 0 0 8px;
+  text-align: right;
+}
+.cloud-warn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--error) 60%, transparent);
+  background: color-mix(in srgb, var(--error) 12%, var(--surface));
+  font-size: var(--text-sm);
+}
+.cloud-warn strong { color: var(--error); text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--text-xs); }
+.cloud-warn span { flex: 1 1 260px; color: var(--muted); }
+
 /* ---------- Demo mode ---------- */
 .demo-banner {
   display: flex;
