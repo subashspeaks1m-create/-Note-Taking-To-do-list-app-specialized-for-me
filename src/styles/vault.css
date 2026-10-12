@@ -228,3 +228,25 @@
   .vault-stats > div { min-width: 0; flex: 1 1 40%; }
   .vault-detail__art { display: none; }
 }
+
+/* The picture character fills the stage; the Picture / 3D switch leads the controls. */
+.vault-pic {
+  position: relative;
+  display: flex;
+  flex: 1;
+  container-type: inline-size;
+  min-height: 0;
+}
+.vault-pic .stage {
+  min-height: 0;
+  background: transparent;
+}
+.vault-status--picture { color: var(--learning); }
+.vault-mode {
+  display: inline-flex;
+  gap: 4px;
+  padding-right: 6px;
+  margin-right: 2px;
+  border-right: 1px solid var(--border-quiet);
+}
+.vault-pic .stage__hint { display: none; }

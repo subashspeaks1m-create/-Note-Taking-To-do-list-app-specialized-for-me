@@ -92,6 +92,10 @@ test('the Vault loads your 3D model, switches outfits and the mask, and keeps au
   await startAt(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/vault');
+  // The picture character is the default; the 3D model is one tap away.
+  await expect(page.getByRole('status').filter({ hasText: /^Picture ·/ })).toBeVisible();
+  await page.getByRole('button', { name: '3D', exact: true }).click();
+  await expect(page.getByRole('button', { name: '3D', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const status = page.getByRole('status').filter({ hasText: /3D model ·|Stand-in|3D is not available|could not/ });
   await expect(status).toBeVisible({ timeout: 60_000 });
   await expect(page.getByRole('button', { name: 'Auto-rotate' })).toBeDisabled();
@@ -111,11 +115,28 @@ test('the Vault loads your 3D model, switches outfits and the mask, and keeps au
   await expect(mask).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('the Character page stands your 3D model on its platform, with the 2D portrait until it loads', async ({ page }) => {
-  test.setTimeout(120_000);
+test("you stand on the platform as a picture in today's outfit, turn with the platform, and a missing picture says so", async ({ page }) => {
   await startAt(page);
   await page.goto('/character');
-  // Either the 3D model (WebGL) or the portrait fallback: never an empty platform.
-  await expect(page.getByRole('img', { name: /You in 3D, wearing Initiate/ }).or(page.locator('.stage__portrait')).first()).toBeVisible({ timeout: 60_000 });
+  const figure = page.locator('.pfig');
+  await expect(figure).toHaveAttribute('data-outfit', 'initiate');
+  await expect.poll(() => figure.locator('img.is-on').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await expect(page.getByRole('link', { name: 'change outfit in the Vault' })).toBeVisible();
+
+  // An outfit without its picture yet shows your outline, clearly labeled.
+  await page.goto('/vault');
+  await page.getByRole('button', { name: /^Mercenary/ }).first().click();
+  await expect(page.getByRole('status').filter({ hasText: 'Picture coming' })).toBeVisible();
+
+  // The Training Tee has all eight sides: turning the platform turns him.
+  await page.getByRole('button', { name: /^Training Tee/ }).first().click();
+  await page.getByRole('button', { name: 'Wear today' }).click();
+  await expect(page.getByText("You're wearing this today")).toBeVisible();
+  await page.goto('/character');
+  await expect(figure).toHaveAttribute('data-outfit', 'training-tee');
+  const side = () => figure.locator('img.is-on').getAttribute('src');
+  const before = await side();
+  await page.getByRole('group', { name: /Drag or use the left and right arrow keys/ }).focus();
+  for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight');
+  await expect.poll(side).not.toBe(before);
 });

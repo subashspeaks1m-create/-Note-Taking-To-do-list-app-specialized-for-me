@@ -34,7 +34,7 @@ Result: **29 pass, 3 pass with a noted gap, 0 fail.** One check (#22) was change
 | 19 | Level thresholds 0/100/300/600/1000/1500; 299 = L2, 300 = L3; no double counting | Pass | unit `levels` ×3 |
 | 20 | One documentation bonus per task, one reflection bonus per day, 200/day/track completion cap | Pass | unit `pays one documentation bonus…`, `pays a documented reflection once per day`, `caps completion XP at 200…` |
 | 21 | Reversing a capped source refills deterministically; changing effort can't inflate a frozen reward | Pass | unit `caps … refills from the next task`, `changing effort after completion cannot raise the reward` |
-| 22 | Rank unlocks, locked items can't equip, unlocks persist, demo doesn't touch real unlocks | Pass (rule changed by Prem) | Prem chose: rank forms come from logged earnings ($100K/$1M/$100M/$1B) and all 14 outfits are open from day one. Unit `character`, `wardrobe`, `unlocks and chests`, `vault`; e2e `Demo mode … leaves real data untouched` |
+| 22 | Rank unlocks, locked items can't equip, unlocks persist, demo doesn't touch real unlocks | Pass (rule changed by Prem) | Prem chose: rank forms come from logged earnings ($100K/$1M/$100M/$1B) and all 15 outfits are open from day one. Unit `character`, `wardrobe`, `unlocks and chests`, `vault`; e2e `Demo mode … leaves real data untouched` |
 | 23 | Character video keeps proportions with a still fallback; suit pictures labeled static | Pass | e2e `character #23`. Suit pictures are labeled "Concept picture" in the Vault |
 | 24 | Playback failure, missing asset, reduced motion, hidden page and offscreen all fall back; no automatic sound | Pass | e2e `character #24` ×2 (all portrait files blocked, `visibilitychange`, scrolled offscreen, sound setting off by default) |
 | 25 | Streak: yesterday ends a 7-day run → still 7 today; opening the app gives nothing; future evidence doesn't count | Pass | unit `streaks` ×3, `stats: keeps the streak alive in the morning` |
@@ -53,7 +53,8 @@ Result: **29 pass, 3 pass with a noted gap, 0 fail.** One check (#22) was change
 
 ## Known limitations
 
-- **3D model:** your Blender wardrobe is in the Vault and on the Character page (see `docs/3D_MODEL.md`). Likeness is approximate, and phone frame rate hasn't been measured on a real device.
+- **Character pictures:** you stand on the platform as a cut-out picture (HTML/CSS, no 3D) in today's outfit. Eight outfits have illustrated front pictures and the Training Tee has all eight sides; Mercenary, Sorcerer, Thunder Lord, Arc Armor, Mech Arms and Dark Knight show your outline in their colors until Prem's pictures arrive (prompts in the project's `ascend-build/character-art/html-character-prompts.md`). Front-only pictures lean with the platform instead of turning. The pictures are about 450 px tall, so they look slightly soft on large high-density screens.
+- **3D model:** your Blender wardrobe is one tap away in the Vault (the 3D switch; see `docs/3D_MODEL.md`). Likeness is approximate, and phone frame rate hasn't been measured on a real device.
 - **Video codec:** the test browser (open-source Chromium) can't play H.264, so playback rules were tested with a VP9 copy of the same loop (`e2e/fixtures/portrait-test.webm`). Chrome, Edge and Safari play the MP4; a browser without H.264 shows the still frame.
 - **AI coach:** tested against a stand-in for OpenRouter, never with a real key. Free models come and go; "Best free model" tries several and then OpenRouter's live free list.
 - **Not tested:** iPhone Safari, Firefox, real screen readers, real installs to a home screen.
@@ -74,6 +75,7 @@ React 19.3, React Router 7.18, Dexie 4.4 (+ dexie-react-hooks 4.4), TipTap 3.31,
 ## Media provenance
 
 - `public/assets/character/`: your supplied character video (scaled, looped forward and back) and its still frames; Scholar, Builder and Ascendant portraits from the Ascend kit (generated, static).
+- `public/assets/character/outfits/`: cut-outs of the Vision Full Body kit's generated outfit lineup and 360° turnaround (made with `tools/cutout-figures.py`).
 - `public/assets/vault/`: outfit concept pictures from the Vision Full Body kit's generated reference art, plus six renders of the 3D model from the Realism Wardrobe v6 kit (static).
 - `src/assets/models/subash-wardrobe.glb`: web copy of the Realism Wardrobe v6 Blender file; MakeHuman/MPFB (CC0), Elvaerwyn (CC-BY), credits in `docs/3D_MODEL.md`.
 - `public/assets/art/`: Microsoft Fluent Emoji (MIT). Self-drawing nav icons: line-md 1.2.16 (MIT).

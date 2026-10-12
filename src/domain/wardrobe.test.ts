@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_OUTFIT, OUTFITS, matchesOutfit, nextTier, outfitById, tierForLevel } from './wardrobe';
 
 describe('wardrobe', () => {
-  it('has fourteen outfits with unique ids, starting from the default', () => {
+  it('has fifteen outfits with unique ids, starting from the default', () => {
     const ids = OUTFITS.map((o) => o.id);
-    expect(ids).toHaveLength(14);
-    expect(new Set(ids).size).toBe(14);
+    expect(ids).toHaveLength(15);
+    expect(new Set(ids).size).toBe(15);
     expect(ids[0]).toBe(DEFAULT_OUTFIT);
   });
 

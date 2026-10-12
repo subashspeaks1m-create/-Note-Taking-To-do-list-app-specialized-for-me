@@ -56,8 +56,13 @@ source-assets  original kit media, kept for provenance, not shipped
   (real alpha), resized to 900 px. They are static artwork. In-app motion and owner-made
   video loops arrive in stage 5.
 - `public/assets/vault/`: outfit pictures (concept art and renders of the 3D model).
-- `src/assets/models/subash-wardrobe.glb`: your 3D character with all 14 outfits, used by the
-  Vault and the Character page. See [docs/3D_MODEL.md](docs/3D_MODEL.md).
+- `public/assets/character/outfits/`: the cut-out pictures you stand on the platform as. To add
+  one, cut it from a grey-background image with
+  `python3 tools/cutout-figures.py IMAGE 1 1 public/assets/character/outfits <outfit-id>`
+  (a 360° sheet of 8 views: `IMAGE 4 2 public/assets/character/outfits/<outfit-id> 0 45 90 135 180 225 270 315`)
+  and list the id in `src/features/character/pictures.ts`.
+- `src/assets/models/subash-wardrobe.glb`: your 3D character with the first 14 outfits, shown in
+  the Vault's 3D view. See [docs/3D_MODEL.md](docs/3D_MODEL.md).
 - SVG icons, badges and stage art, and WAV cues: original kit assets. Fluent Emoji art and
   line-md icons are MIT. See the acceptance report for the full list.
 

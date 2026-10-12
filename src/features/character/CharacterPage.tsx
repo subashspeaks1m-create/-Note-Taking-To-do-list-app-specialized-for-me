@@ -16,7 +16,6 @@ import { BADGES, rankLabel } from '../../domain/config';
 import { PLATFORMS, TRANSFORMATIONS, cosmeticId, platformById, transformationState } from '../../domain/unlocks';
 import { outfitById } from '../../domain/wardrobe';
 import { useChestGoals, useEarnings, useOutfit, usePlatform, useWearing } from '../../storage/queries';
-import { modelSource } from '../vault/models';
 import { useProfile, useRepo } from '../../storage/StorageProvider';
 import { CharacterStage } from './CharacterStage';
 import { ChestCard, PlatformSwatch } from './Chests';
@@ -58,10 +57,9 @@ export function CharacterPage() {
   const ownedPlatform = (id: string) => id === 'base' || game.owned.has(cosmeticId.platform(id));
   const platformId = platform && ownedPlatform(platform) ? platform : 'base';
   const tf = transformationState(habit.streak.longest, habit.streak.current);
-  // Your real 3D model in today's Vault outfit stands on the platform; trying on a rank form shows its art.
+  // You in today's Vault outfit stand on the platform as a picture; trying on a rank form shows its art.
   const todayOutfit = outfitById(wearing);
-  const source = previewing ? null : modelSource(todayOutfit.id);
-  const model = source ? { source, outfit: todayOutfit } : null;
+  const picture = previewing ? null : todayOutfit;
 
   const equip = async (look: Look) => {
     try {
@@ -93,8 +91,8 @@ export function CharacterPage() {
             platform={platformId}
             aura={tf.earned ? { id: tf.earned.id, lit: tf.lit } : null}
             gear={game.gear}
-            model={model}
-            label={model ? `You in 3D, wearing ${todayOutfit.name}` : `${shown.name}${previewing ? ', trying on' : ', equipped'}`}
+            picture={picture}
+            label={picture ? `You, wearing ${todayOutfit.name}` : `${shown.name}${previewing ? ', trying on' : ', equipped'}`}
           />
           <span className="chamber__equipped">
             {previewing ? (
@@ -102,7 +100,7 @@ export function CharacterPage() {
                 Trying on <strong>{shown.name}</strong>
                 {!game.lookUnlocked(shown) && ' · locked'}
               </>
-            ) : model ? (
+            ) : picture ? (
               <>
                 <strong>{shown.name}</strong>
                 {todayOutfit.name !== shown.name && <> · wearing {todayOutfit.name}</>} · <Link to="/vault">change outfit in the Vault</Link>

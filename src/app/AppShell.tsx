@@ -77,7 +77,7 @@ export function AppShell() {
         {prefs.stageBannerDismissed !== PREVIEW_STAGE && (
           <div className="stage-banner" role="note">
             <span className="stage-banner__tag">Stage {PREVIEW_STAGE} preview</span>
-            <span>New: your 3D character from Blender is in the Vault and on the Character page. Stage 7: an AI coach writes notes on your weekly report (add your OpenRouter key in Settings), demo mode lives in Settings, and every acceptance check has been run.</span>
+            <span>New: you now stand on the platform as a picture in today's outfit (Character page and Vault); the Training Tee turns all the way round, and the 3D model is one tap away in the Vault. Stage 7: an AI coach writes notes on your weekly report (add your OpenRouter key in Settings), demo mode lives in Settings, and every acceptance check has been run.</span>
             <button type="button" className="icon-btn icon-btn--sm" aria-label="Dismiss preview note" onClick={() => setPref('stageBannerDismissed', PREVIEW_STAGE)}>
               <Icon name="close" size={16} />
             </button>
