@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '../../components/Toasts';
+import { askClaudeCoach, useClaudeCoach } from '../coach/claudeCoach';
 import { AUTO_MODEL, askCoach, coachKey, coachModel, listFreeModels, maskKey } from '../coach/openrouter';
 
 /**
@@ -12,16 +13,29 @@ export function CoachSettings() {
   const [draft, setDraft] = useState('');
   const [model, setModel] = useState(() => coachModel.get());
   const [models, setModels] = useState<{ id: string; name: string }[] | null>(null);
-  const [busy, setBusy] = useState<'test' | 'models' | null>(null);
+  const [busy, setBusy] = useState<'test' | 'models' | 'claude' | null>(null);
+  const claude = useClaudeCoach();
 
   useEffect(() => {
-    if (!saved || models) return;
+    if (!saved || models || claude !== false) return;
     const ctl = new AbortController();
     listFreeModels(ctl.signal)
       .then(setModels)
       .catch(() => undefined);
     return () => ctl.abort();
-  }, [saved, models]);
+  }, [saved, models, claude]);
+
+  const testClaude = async () => {
+    setBusy('claude');
+    try {
+      await askClaudeCoach([{ role: 'user', content: 'Reply with the single word: ready' }]);
+      toast({ message: 'Connected. Claude answered.', tone: 'success' });
+    } catch (e) {
+      toast({ message: (e as Error).message, tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const save = () => {
     const k = draft.trim();
@@ -75,8 +89,24 @@ export function CoachSettings() {
         AI coach
       </h2>
       <p className="settings-group__lede">
-        Writes coach's notes on your weekly and monthly reports through your own OpenRouter key, using free models only. It reads everything in that period, journal text included, and sends it to OpenRouter and the model's provider when you ask for notes.
+        Writes coach's notes on your weekly and monthly reports. It reads everything in that period, journal text included, when you ask for notes.
       </p>
+
+      {claude && (
+        <div className="setting">
+          <span className="setting__label">
+            Claude (in this app link)
+            <span className="setting__help">
+              Ready, no key needed. Inside the Claude app the coach asks Claude through your Claude account; the first time, choose Allow. The Claude app link does not let pages contact outside websites, so the OpenRouter key below only works when the app runs on its own website or your computer.
+            </span>
+          </span>
+          <div className="setting__actions">
+            <button type="button" className="btn btn--quiet btn--sm" onClick={() => void testClaude()} disabled={busy !== null}>
+              {busy === 'claude' ? 'Testing…' : 'Test'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {saved ? (
         <div className="setting">

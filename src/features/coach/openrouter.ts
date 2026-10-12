@@ -74,9 +74,26 @@ function explain(status: number, body: string): string {
   return `OpenRouter error ${status}${body ? `: ${body.slice(0, 160)}` : ''}`;
 }
 
+/** The Claude app link blocks outside websites; elsewhere a network failure is a connection problem. */
+const inClaudeApp = () => typeof (window as unknown as { claude?: { use?: unknown } }).claude?.use === 'function';
+
+/** fetch, with the browser's bare "Load failed" / "Failed to fetch" turned into a sentence that says what to do. */
+async function request(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (e) {
+    if (init.signal?.aborted) throw e;
+    throw new CoachError(
+      inClaudeApp()
+        ? 'The Claude app link does not let pages contact outside websites, so OpenRouter cannot be reached from here. Your key works when the app runs on its own website or your computer.'
+        : 'Could not reach OpenRouter. Check your internet connection and try again.',
+    );
+  }
+}
+
 /** Free models OpenRouter offers right now, by id. */
 export async function listFreeModels(signal?: AbortSignal): Promise<{ id: string; name: string }[]> {
-  const res = await fetch(`${API}/models`, { signal });
+  const res = await request(`${API}/models`, { signal });
   if (!res.ok) throw new CoachError(explain(res.status, ''), res.status);
   const json = (await res.json()) as { data?: { id: string; name?: string }[] };
   return (json.data ?? []).filter((m) => isFreeModel(m.id)).map((m) => ({ id: m.id, name: m.name ?? m.id }));
@@ -89,7 +106,7 @@ export interface ChatMessage {
 
 async function complete(key: string, model: string, messages: ChatMessage[], signal?: AbortSignal): Promise<string> {
   if (!isFreeModel(model)) throw new CoachError('Only free models are allowed.');
-  const res = await fetch(`${API}/chat/completions`, {
+  const res = await request(`${API}/chat/completions`, {
     method: 'POST',
     signal,
     headers: {
