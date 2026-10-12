@@ -41,7 +41,10 @@ test('inside the Claude app the coach writes notes through Claude with no key', 
 
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByText('Claude (in this app link)')).toBeVisible();
-  await page.getByRole('button', { name: 'Test' }).first().click();
+  // OpenRouter can't be reached from inside the link, so none of its controls are offered there.
+  await expect(page.getByRole('button', { name: 'Test' })).toHaveCount(1);
+  await expect(page.locator('#coach-key, #coach-model')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Test' }).click();
   await expect(page.getByText('Connected. Claude answered.')).toBeVisible();
 
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Insights' }).click();
