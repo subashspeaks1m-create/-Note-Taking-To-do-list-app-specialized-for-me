@@ -33,7 +33,7 @@ async function device(cloud: FakeCloud) {
   open.push(db);
   const repo = new Repository(db, () => clock);
   await repo.ensureInitialized();
-  const sync = new CloudSync(db, new CloudSpace(cloud, 'data/users/u1'), () => clock);
+  const sync = new CloudSync(db, new CloudSpace(cloud, 'data/users/u1'), () => clock, () => repo.dedupeStarterPlans());
   return { db, repo, sync };
 }
 
@@ -117,5 +117,34 @@ describe('account sync', () => {
     const b = await device(cloud);
     await b.sync.initial();
     expect(await titles(b.db)).toEqual(['Good copy']);
+  });
+
+  it('every device ends up with one of each starter plan, goals and writing kept', async () => {
+    const cloud = new FakeCloud();
+    const a = await device(cloud);
+    await a.sync.initial();
+    // Copies like the ones older versions made: random ids, one holding a goal, another holding writing.
+    const copies = async (n: number) => {
+      const base = (await a.db.plans.toArray()).map((p) => ({ ...p }));
+      for (let i = 0; i < n; i++) await a.db.plans.bulkAdd(base.map((p) => ({ ...p, id: `old-${i}-${p.kind}`, createdAt: `2026-10-12T1${i}:00:00.000Z` })));
+    };
+    await copies(2);
+    await a.db.plans.update('old-0-year', { statement: 'Ship the app and earn the first $10K.' });
+    const goal = await a.repo.createGoal({ planId: 'old-1-year', title: 'First $10K', category: 'doing' } as Parameters<typeof a.repo.createGoal>[0], '2026-10-12');
+    expect(await a.db.plans.count()).toBe(9);
+
+    expect(await a.repo.dedupeStarterPlans()).toBe(6);
+    const plans = await a.db.plans.toArray();
+    expect(plans.map((p) => p.id).sort()).toEqual(['plan-decade', 'plan-sprint', 'plan-year']);
+    expect(plans.find((p) => p.kind === 'year')!.statement).toBe('Ship the app and earn the first $10K.');
+    expect((await a.db.goals.get(goal.id))!.planId).toBe('plan-year');
+    await a.sync.flush();
+
+    // A fresh device and the account both agree: three plans, nothing added back.
+    const b = await device(cloud);
+    await b.sync.initial();
+    await b.repo.dedupeStarterPlans();
+    expect(await b.db.plans.count()).toBe(3);
+    expect(await a.repo.dedupeStarterPlans()).toBe(0);
   });
 });

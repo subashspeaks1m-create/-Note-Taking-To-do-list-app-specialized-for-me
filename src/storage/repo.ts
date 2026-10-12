@@ -103,6 +103,9 @@ const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', wearing: 'weari
  * IndexedDB, so a sync service could later implement the same surface.
  * Every multi-record change runs in one transaction.
  */
+/** Starter plans have fixed ids, so every device agrees on them. */
+export const defaultPlanId = (kind: string) => `plan-${kind}`;
+
 export class Repository {
   constructor(
     readonly db: AppDatabase,
@@ -131,7 +134,7 @@ export class Repository {
         persistence: 'not-requested',
       };
       const plans: VisionPlan[] = PLAN_DEFAULTS.map((p) => ({
-        id: uuid(),
+        id: defaultPlanId(p.kind),
         kind: p.kind,
         title: p.title,
         startDate: p.startDate,
@@ -149,6 +152,40 @@ export class Repository {
         { key: KV.profile, value: profile },
       ]);
       await this.db.plans.bulkAdd(plans);
+    });
+  }
+
+  /**
+   * Keeps exactly one of each starter plan. Starter plans used to get random
+   * ids, so a device that opened with empty storage could add a second set
+   * that then merged in. Copies of a starter plan (same kind and dates) are
+   * folded into one with the fixed id: goals move to it, written text is kept
+   * (the most-written copy wins; empty fields are filled from the others).
+   * Returns how many copies were removed.
+   */
+  async dedupeStarterPlans(): Promise<number> {
+    return this.db.transaction('rw', this.db.plans, this.db.goals, async () => {
+      let removed = 0;
+      const all = await this.db.plans.toArray();
+      const goals = await this.db.goals.toArray();
+      for (const d of PLAN_DEFAULTS) {
+        const id = defaultPlanId(d.kind);
+        const copies = all.filter((p) => p.kind === d.kind && p.startDate === d.startDate && p.endDate === d.endDate);
+        if (!copies.length || (copies.length === 1 && copies[0]!.id === id)) continue;
+        const TEXT = ['statement', 'notes', 'successCriteria', 'review'] as const;
+        const score = (p: VisionPlan) => goals.filter((g) => g.planId === p.id).length * 10 + TEXT.filter((f) => p[f].trim()).length + (p.finishedAt ? 1 : 0) + (p.title !== d.title ? 1 : 0);
+        const ranked = [...copies].sort((a, b) => score(b) - score(a) || (b.updatedAt > a.updatedAt ? 1 : b.updatedAt < a.updatedAt ? -1 : 0) || a.createdAt.localeCompare(b.createdAt));
+        const best = ranked[0]!;
+        const kept: VisionPlan = { ...best, id, createdAt: copies.reduce((min, p) => (p.createdAt < min ? p.createdAt : min), best.createdAt) };
+        for (const f of TEXT) if (!kept[f].trim()) kept[f] = ranked.find((p) => p[f].trim())?.[f] ?? '';
+        kept.finishedAt = kept.finishedAt ?? ranked.find((p) => p.finishedAt)?.finishedAt ?? null;
+        const oldIds = new Set(copies.map((p) => p.id));
+        for (const g of goals) if (g.planId && oldIds.has(g.planId) && g.planId !== id) await this.db.goals.update(g.id, { planId: id });
+        await this.db.plans.bulkDelete(copies.map((p) => p.id).filter((x) => x !== id));
+        await this.db.plans.put(kept);
+        removed += copies.length - 1;
+      }
+      return removed;
     });
   }
 

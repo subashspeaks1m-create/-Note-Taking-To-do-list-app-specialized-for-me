@@ -190,7 +190,13 @@ export class CloudSync {
   private pulled = false;
   private stopFns: (() => void)[] = [];
 
-  constructor(private db: AppDatabase, private space: CloudSpace, private now: () => Date) {}
+  constructor(
+    private db: AppDatabase,
+    private space: CloudSpace,
+    private now: () => Date,
+    /** Tidies data after the account copy is brought in (for example folding duplicate starter plans). */
+    private afterImport: () => Promise<unknown> = async () => undefined,
+  ) {}
 
   getStatus(): CloudStatus {
     return this.status;
@@ -263,6 +269,7 @@ export class CloudSync {
     }
     const untouchedHere = !base || base.hash === mine.hash;
     await importBackup(this.db, theirs, untouchedHere ? 'replace' : 'merge');
+    await this.afterImport();
     if (untouchedHere) {
       await this.setBase({ id: m.id, hash: m.hash });
       this.lastHash = m.hash;
@@ -333,7 +340,10 @@ export class CloudSync {
     }
     this.running = (async () => {
       try {
-        await job();
+        // Two copies of the page can share one browser database; only one syncs at a time.
+        const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+        if (locks?.request) await locks.request('pog-cloud-sync', job);
+        else await job();
         this.failures = 0;
       } catch (e) {
         const code = (e as { code?: string })?.code;

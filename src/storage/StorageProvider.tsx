@@ -53,13 +53,14 @@ export function StorageProvider({ children, dbName = REAL_DB_NAME }: { children:
           setCloudUnavailable(true);
           return;
         }
-        sync = new CloudSync(db, space, () => clock.now());
+        sync = new CloudSync(db, space, () => clock.now(), () => repo.dedupeStarterPlans());
         // If the account can't be reached, this keeps retrying in the background and saves nothing over it first.
         await sync.initial();
         if (cancelled) return;
         sync.start();
         setCloud(sync);
       })
+      .then(() => (dbName === REAL_DB_NAME ? repo.dedupeStarterPlans() : undefined))
       .then(() => repo.repairLedger())
       .then(() => !cancelled && setBoot({ status: 'ready' }))
       .catch((e: unknown) => {
