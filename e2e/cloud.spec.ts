@@ -64,3 +64,55 @@ test('outside claude.ai nothing about the account shows', async ({ page }) => {
   await addTask(page, 'Local only', 'Do');
   await expect(page.getByText(/your account/)).toHaveCount(0);
 });
+
+/** Makes the browser refuse to open any database, the way strict privacy settings can. */
+async function blockStorage(context: BrowserContext) {
+  await context.addInitScript(() => {
+    IDBFactory.prototype.open = function () {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    };
+  });
+}
+
+test('inside claude.ai the app still opens from the account when the browser refuses storage', async ({ browser }) => {
+  const store: Store = new Map();
+  const first = await browser.newContext();
+  const page = await openWithAccount(first, store);
+  await startAt(page);
+  await page.goto('/');
+  await addTask(page, 'Saved before the block', 'Learn');
+  await expect(page.getByRole('status').filter({ hasText: /^Saved to your account/ })).toBeVisible({ timeout: 15_000 });
+  await first.close();
+
+  const second = await browser.newContext();
+  await blockStorage(second);
+  const again = await openWithAccount(second, store);
+  await startAt(again);
+  await again.goto('/');
+  const list = again.getByRole('list', { name: /^Tasks for/ });
+  await expect(list.getByText('Saved before the block', { exact: true })).toBeVisible();
+  await expect(again.getByText('Storage is unavailable')).toHaveCount(0);
+  // Changes made now still reach the account.
+  await addTask(again, 'Added while blocked', 'Do');
+  await expect(again.getByRole('status').filter({ hasText: /^Saved to your account/ })).toBeVisible({ timeout: 15_000 });
+  await second.close();
+
+  const third = await browser.newContext();
+  const last = await openWithAccount(third, store);
+  await startAt(last);
+  await last.goto('/');
+  await expect(last.getByRole('list', { name: /^Tasks for/ }).getByText('Added while blocked', { exact: true })).toBeVisible();
+  await third.close();
+});
+
+test('outside claude.ai a refused storage says why and offers to try again', async ({ browser }) => {
+  const context = await browser.newContext();
+  await blockStorage(context);
+  const page = await context.newPage();
+  await startAt(page);
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Storage is unavailable' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/^Details: .*SecurityError/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await context.close();
+});
