@@ -478,6 +478,10 @@ select.input--sm {
   color: var(--muted);
 }
 
+.boot__slow {
+  color: var(--muted);
+}
+
 .boot__detail {
   font-size: var(--text-xs);
   overflow-wrap: anywhere;

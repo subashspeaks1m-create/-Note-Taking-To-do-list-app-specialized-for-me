@@ -50,6 +50,7 @@ export const CLOUD_BASE_KEY = 'cloudBase';
 const CHUNK_CHARS = { 'gzip-base64': 180_000, json: 40_000 } as const;
 const DEBOUNCE_MS = 400;
 const RETRY_MS = [3000, 10_000, 30_000, 60_000];
+const LOCK_WAIT_MS = 15_000;
 
 // ---------- Connecting ----------
 
@@ -342,7 +343,9 @@ export class CloudSync {
       try {
         // Two copies of the page can share one browser database; only one syncs at a time.
         const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
-        if (locks?.request) await locks.request('pog-cloud-sync', job);
+        // A copy of the page stuck mid-save in another tab must not hold this one up for ever.
+        const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(LOCK_WAIT_MS) : undefined;
+        if (locks?.request) await locks.request('pog-cloud-sync', signal ? { signal } : {}, job);
         else await job();
         this.failures = 0;
       } catch (e) {

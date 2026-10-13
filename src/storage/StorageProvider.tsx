@@ -29,6 +29,11 @@ const StorageContext = createContext<StorageCtx | null>(null);
 type BootState = { status: 'loading' } | { status: 'ready' } | { status: 'failed'; message: string; detail: string };
 type Opened = { db: AppDatabase; repo: Repository; memoryOnly: boolean };
 
+/** How long start-up waits for the account copy before opening with what this browser has. */
+const CLOUD_WAIT_MS = 10_000;
+/** After this long on the logo, offer a way out. */
+const SLOW_BOOT_MS = 20_000;
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Dexie wraps the browser's own error; the inner one names the real cause. */
 const errorName = (e: unknown): string => {
@@ -90,6 +95,13 @@ export function StorageProvider({ children, dbName = REAL_DB_NAME }: { children:
   const [boot, setBoot] = useState<BootState>({ status: 'loading' });
   const [cloud, setCloud] = useState<CloudSync | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (boot.status !== 'loading') return;
+    const timer = setTimeout(() => setSlow(true), SLOW_BOOT_MS);
+    return () => clearTimeout(timer);
+  }, [boot.status, attempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +133,8 @@ export function StorageProvider({ children, dbName = REAL_DB_NAME }: { children:
         else {
           sync = new CloudSync(db, space, now, () => repo.dedupeStarterPlans());
           // If the account can't be reached, this keeps retrying in the background and saves nothing over it first.
-          await sync.initial();
+          // The app opens after a short wait either way, so a slow connection never leaves it stuck on the logo.
+          await Promise.race([sync.initial(), sleep(CLOUD_WAIT_MS)]);
           if (closeIfCancelled()) return;
           sync.start();
           setCloud(sync);
@@ -184,6 +197,22 @@ export function StorageProvider({ children, dbName = REAL_DB_NAME }: { children:
       <div className="boot" aria-busy="true">
         <img src={`${import.meta.env.BASE_URL}assets/ui/logo-mark.svg`} alt="" width={48} height={48} />
         <span className="visually-hidden">Opening your data…</span>
+        {slow && (
+          <>
+            <p className="boot__slow">This is taking longer than usual.</p>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => {
+                setSlow(false);
+                setBoot({ status: 'loading' });
+                setAttempt((n) => n + 1);
+              }}
+            >
+              Try again
+            </button>
+          </>
+        )}
       </div>
     );
   }
