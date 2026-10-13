@@ -6,6 +6,7 @@ import { formatShort, dateKeyInZone } from '../../date/localDate';
 import { useCoachNote, usePrinciples } from '../../storage/queries';
 import { useProfile, useRepo } from '../../storage/StorageProvider';
 import { coachMessages, parseCoach, type CoachInput } from './coachPrompt';
+import { askClaudeCoach, useClaudeCoach } from './claudeCoach';
 import { askCoach, coachKey, coachModel } from './openrouter';
 
 type Props = Omit<CoachInput, 'principles' | 'name'>;
@@ -21,7 +22,8 @@ export function CoachPanel(props: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const ctl = useRef<AbortController | null>(null);
-  const hasKey = !!coachKey.get();
+  const claude = useClaudeCoach();
+  const hasKey = !!coachKey.get() || claude === true;
   const empty = props.stats.completed === 0 && props.stats.entries === 0 && props.stats.scheduled === 0;
   const label = kind === 'week' ? 'week' : 'month';
 
@@ -31,7 +33,7 @@ export function CoachPanel(props: Props) {
     ctl.current = new AbortController();
     try {
       const messages = coachMessages({ ...props, name: profile.displayName, principles: (principles ?? []).map((p) => p.text) });
-      const r = await askCoach(coachKey.get(), coachModel.get(), messages, { signal: ctl.current.signal });
+      const r = claude ? await askClaudeCoach(messages, ctl.current.signal) : await askCoach(coachKey.get(), coachModel.get(), messages, { signal: ctl.current.signal });
       await repo.saveCoachNote(kind, range.start, r);
       toast({ message: "Coach's notes saved with this report", tone: 'success' });
     } catch (e) {

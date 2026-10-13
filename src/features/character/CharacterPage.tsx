@@ -14,12 +14,12 @@ import {
 } from '../../domain/character';
 import { BADGES, rankLabel } from '../../domain/config';
 import { PLATFORMS, TRANSFORMATIONS, cosmeticId, platformById, transformationState } from '../../domain/unlocks';
-import { outfitById } from '../../domain/wardrobe';
+import { OUTFITS, outfitById, type Outfit } from '../../domain/wardrobe';
 import { useChestGoals, useEarnings, useOutfit, usePlatform, useWearing } from '../../storage/queries';
-import { modelSource } from '../vault/models';
 import { useProfile, useRepo } from '../../storage/StorageProvider';
 import { CharacterStage } from './CharacterStage';
 import { ChestCard, PlatformSwatch } from './Chests';
+import { PLACEHOLDER_SHAPE, outfitPicture } from './pictures';
 import { ContentForm, ContentLog, EquipmentGrid } from './Equipment';
 import { Silhouette } from './Silhouette';
 import { useGameState, type GameState } from './useGame';
@@ -44,7 +44,17 @@ export function CharacterPage() {
   const chests = useChestGoals();
   const repo = useRepo();
   const toast = useToast();
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreviewState] = useState<string | null>(null);
+  const [trying, setTrying] = useState<string | null>(null);
+  // Trying on a rank form and trying on an outfit replace each other on the platform.
+  const setPreview = (id: string | null) => {
+    setPreviewState(id);
+    setTrying(null);
+  };
+  const tryOutfit = (id: string | null) => {
+    setTrying(id);
+    setPreviewState(null);
+  };
 
   if (!game) return <div className="page page--character" />;
   const { stats, progress, habit } = game;
@@ -58,10 +68,20 @@ export function CharacterPage() {
   const ownedPlatform = (id: string) => id === 'base' || game.owned.has(cosmeticId.platform(id));
   const platformId = platform && ownedPlatform(platform) ? platform : 'base';
   const tf = transformationState(habit.streak.longest, habit.streak.current);
-  // Your real 3D model in today's Vault outfit stands on the platform; trying on a rank form shows its art.
+  // You in today's Vault outfit stand on the platform as a picture; trying on a rank form shows its art.
   const todayOutfit = outfitById(wearing);
-  const source = previewing ? null : modelSource(todayOutfit.id);
-  const model = source ? { source, outfit: todayOutfit } : null;
+  const tried = trying && trying !== todayOutfit.id ? outfitById(trying) : null;
+  const picture = previewing ? null : (tried ?? todayOutfit);
+
+  const wear = async (o: Outfit) => {
+    try {
+      await repo.setWearing(o.id);
+      setTrying(null);
+      toast({ message: `Wearing ${o.name} today`, tone: 'success' });
+    } catch (e) {
+      toast({ message: (e as Error).message, tone: 'error' });
+    }
+  };
 
   const equip = async (look: Look) => {
     try {
@@ -93,8 +113,8 @@ export function CharacterPage() {
             platform={platformId}
             aura={tf.earned ? { id: tf.earned.id, lit: tf.lit } : null}
             gear={game.gear}
-            model={model}
-            label={model ? `You in 3D, wearing ${todayOutfit.name}` : `${shown.name}${previewing ? ', trying on' : ', equipped'}`}
+            picture={picture}
+            label={picture ? `You, ${tried ? 'trying on' : 'wearing'} ${picture.name}` : `${shown.name}${previewing ? ', trying on' : ', equipped'}`}
           />
           <span className="chamber__equipped">
             {previewing ? (
@@ -102,7 +122,11 @@ export function CharacterPage() {
                 Trying on <strong>{shown.name}</strong>
                 {!game.lookUnlocked(shown) && ' · locked'}
               </>
-            ) : model ? (
+            ) : tried ? (
+              <>
+                Trying on <strong>{tried.name}</strong>
+              </>
+            ) : picture ? (
               <>
                 <strong>{shown.name}</strong>
                 {todayOutfit.name !== shown.name && <> · wearing {todayOutfit.name}</>} · <Link to="/vault">change outfit in the Vault</Link>
@@ -117,6 +141,16 @@ export function CharacterPage() {
             <button type="button" className="btn btn--quiet btn--sm chamber__back" onClick={() => setPreview(null)}>
               Back to {equipped.name}
             </button>
+          )}
+          {tried && (
+            <span className="chamber__back chamber__try">
+              <button type="button" className="btn btn--primary btn--sm" onClick={() => void wear(tried)}>
+                Wear today
+              </button>
+              <button type="button" className="btn btn--quiet btn--sm" onClick={() => setTrying(null)}>
+                Back to {todayOutfit.name}
+              </button>
+            </span>
           )}
         </div>
 
@@ -167,6 +201,16 @@ export function CharacterPage() {
           <p className="chamber__fine">Only money you log counts. Suits, forms and badges you earn from habits are never taken away.</p>
         </div>
       </section>
+
+      <h2 className="section-title">Outfits</h2>
+      <p className="section-sub">
+        All {OUTFITS.length} outfits, open from day one. Tap one to see it on your platform, then wear it for the day.
+      </p>
+      <ul className="outfits">
+        {OUTFITS.map((o) => (
+          <OutfitCard key={o.id} outfit={o} worn={o.id === todayOutfit.id} shown={picture?.id === o.id} onTry={() => tryOutfit(o.id)} />
+        ))}
+      </ul>
 
       <h2 className="section-title">Equipment</h2>
       <p className="section-sub">
@@ -267,6 +311,30 @@ export function CharacterPage() {
 
       <StageNote stage={5}>Suit art and 360° spin clips are added as you make them. Everything else on this page works now.</StageNote>
     </div>
+  );
+}
+
+/** One outfit as a card: your cut-out picture, or your outline in its colors until the picture is made. */
+function OutfitCard({ outfit, worn, shown, onTry }: { outfit: Outfit; worn: boolean; shown: boolean; onTry: () => void }) {
+  const pic = outfitPicture(outfit.id);
+  const c = outfit.colors;
+  return (
+    <li
+      className={`outfit-card ${worn ? 'is-worn' : ''} ${shown ? 'is-shown' : ''}`}
+      style={{ '--rim': c.glow ?? c.cape ?? c.top, '--top': c.top, '--bottom': c.bottom, '--shape': `url("${PLACEHOLDER_SHAPE}")` } as CSSProperties}
+    >
+      <button type="button" className="outfit-card__btn" aria-pressed={shown} onClick={onTry}>
+        <span className="outfit-card__art">
+          {pic ? <img src={pic.src} alt="" loading="lazy" decoding="async" draggable={false} /> : <span className="outfit-card__shape" aria-hidden="true" />}
+        </span>
+        <span className="outfit-card__name">{outfit.name}</span>
+        <span className="outfit-card__tags">
+          {worn && <span className="outfit-card__tag outfit-card__tag--worn">Wearing</span>}
+          {pic?.frames && <span className="outfit-card__tag">360°</span>}
+          {!pic && <span className="outfit-card__tag">Picture coming</span>}
+        </span>
+      </button>
+    </li>
   );
 }
 

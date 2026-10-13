@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '../../components/Toasts';
+import { askClaudeCoach, useClaudeCoach } from '../coach/claudeCoach';
 import { AUTO_MODEL, askCoach, coachKey, coachModel, listFreeModels, maskKey } from '../coach/openrouter';
 
 /**
@@ -12,16 +13,29 @@ export function CoachSettings() {
   const [draft, setDraft] = useState('');
   const [model, setModel] = useState(() => coachModel.get());
   const [models, setModels] = useState<{ id: string; name: string }[] | null>(null);
-  const [busy, setBusy] = useState<'test' | 'models' | null>(null);
+  const [busy, setBusy] = useState<'test' | 'models' | 'claude' | null>(null);
+  const claude = useClaudeCoach();
 
   useEffect(() => {
-    if (!saved || models) return;
+    if (!saved || models || claude !== false) return;
     const ctl = new AbortController();
     listFreeModels(ctl.signal)
       .then(setModels)
       .catch(() => undefined);
     return () => ctl.abort();
-  }, [saved, models]);
+  }, [saved, models, claude]);
+
+  const testClaude = async () => {
+    setBusy('claude');
+    try {
+      await askClaudeCoach([{ role: 'user', content: 'Reply with the single word: ready' }]);
+      toast({ message: 'Connected. Claude answered.', tone: 'success' });
+    } catch (e) {
+      toast({ message: (e as Error).message, tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const save = () => {
     const k = draft.trim();
@@ -75,78 +89,113 @@ export function CoachSettings() {
         AI coach
       </h2>
       <p className="settings-group__lede">
-        Writes coach's notes on your weekly and monthly reports through your own OpenRouter key, using free models only. It reads everything in that period, journal text included, and sends it to OpenRouter and the model's provider when you ask for notes.
+        Writes coach's notes on your weekly and monthly reports. It reads everything in that period, journal text included, when you ask for notes.
       </p>
 
-      {saved ? (
+      {claude && (
         <div className="setting">
           <span className="setting__label">
-            OpenRouter key
+            Claude (in this app link)
             <span className="setting__help">
-              <span className="tabular">{maskKey(saved)}</span> · stored in this browser only, never in backups
+              Ready, no key needed. Inside the Claude app the coach asks Claude through your Claude account; the first time, choose Allow. To get notes, open Insights and tap Write my week's notes.
             </span>
           </span>
           <div className="setting__actions">
-            <button type="button" className="btn btn--quiet btn--sm" onClick={() => void test()} disabled={busy !== null}>
-              {busy === 'test' ? 'Testing…' : 'Test'}
+            <button type="button" className="btn btn--quiet btn--sm" onClick={() => void testClaude()} disabled={busy !== null}>
+              {busy === 'claude' ? 'Testing…' : 'Test'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {claude ? (
+        // Inside the Claude app link OpenRouter can't be reached, so its controls would only fail.
+        saved && (
+          <div className="setting">
+            <span className="setting__label">
+              OpenRouter key
+              <span className="setting__help">
+                <span className="tabular">{maskKey(saved)}</span> · kept for when the app runs outside the Claude app. Not used here.
+              </span>
+            </span>
             <button type="button" className="btn btn--quiet btn--sm" onClick={remove}>
               Remove
             </button>
           </div>
-        </div>
+        )
       ) : (
-        <form
-          className="setting setting--stack"
-          onSubmit={(e) => {
-            e.preventDefault();
-            save();
-          }}
-        >
-          <label className="setting__label" htmlFor="coach-key">
-            OpenRouter key
-            <span className="setting__help">Paste it here, not in any chat. It stays in this browser and is not included in backups.</span>
-          </label>
-          <div className="setting__inline">
-            <input
-              id="coach-key"
-              className="input"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="sk-or-…"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <button type="submit" className="btn btn--primary btn--sm" disabled={!draft.trim()}>
-              Save key
-            </button>
+        <>
+        {saved ? (
+          <div className="setting">
+            <span className="setting__label">
+              OpenRouter key
+              <span className="setting__help">
+                <span className="tabular">{maskKey(saved)}</span> · stored in this browser only, never in backups
+              </span>
+            </span>
+            <div className="setting__actions">
+              <button type="button" className="btn btn--quiet btn--sm" onClick={() => void test()} disabled={busy !== null}>
+                {busy === 'test' ? 'Testing…' : 'Test'}
+              </button>
+              <button type="button" className="btn btn--quiet btn--sm" onClick={remove}>
+                Remove
+              </button>
+            </div>
           </div>
-        </form>
-      )}
+        ) : (
+          <form
+            className="setting setting--stack"
+            onSubmit={(e) => {
+              e.preventDefault();
+              save();
+            }}
+          >
+            <label className="setting__label" htmlFor="coach-key">
+              OpenRouter key
+              <span className="setting__help">Paste it here, not in any chat. It stays in this browser and is not included in backups.</span>
+            </label>
+            <div className="setting__inline">
+              <input
+                id="coach-key"
+                className="input"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="sk-or-…"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+              />
+              <button type="submit" className="btn btn--primary btn--sm" disabled={!draft.trim()}>
+                Save key
+              </button>
+            </div>
+          </form>
+        )}
 
-      <div className="setting">
-        <label className="setting__label" htmlFor="coach-model">
-          Model
-          <span className="setting__help">Best free model tries a few in turn when one is busy.</span>
-        </label>
-        <div className="setting__actions">
-          <select id="coach-model" className="input setting__select" value={model} onChange={(e) => choose(e.target.value)}>
-            <option value={AUTO_MODEL}>Best free model</option>
-            {model !== AUTO_MODEL && !models?.some((m) => m.id === model) && <option value={model}>{model}</option>}
-            {models?.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-          {!models && (
-            <button type="button" className="btn btn--quiet btn--sm" onClick={() => void loadModels()} disabled={busy !== null}>
-              {busy === 'models' ? 'Loading…' : 'List free models'}
-            </button>
-          )}
+        <div className="setting">
+          <label className="setting__label" htmlFor="coach-model">
+            Model
+            <span className="setting__help">Best free model tries a few in turn when one is busy.</span>
+          </label>
+          <div className="setting__actions">
+            <select id="coach-model" className="input setting__select" value={model} onChange={(e) => choose(e.target.value)}>
+              <option value={AUTO_MODEL}>Best free model</option>
+              {model !== AUTO_MODEL && !models?.some((m) => m.id === model) && <option value={model}>{model}</option>}
+              {models?.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+            {!models && (
+              <button type="button" className="btn btn--quiet btn--sm" onClick={() => void loadModels()} disabled={busy !== null}>
+                {busy === 'models' ? 'Loading…' : 'List free models'}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+        </>
+      )}
     </section>
   );
 }

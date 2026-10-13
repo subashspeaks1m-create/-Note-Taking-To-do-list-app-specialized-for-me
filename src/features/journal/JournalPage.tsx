@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SaveDeclined } from '../../app/saveFile';
 import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { EmptyState, PageHeader } from '../../components/Page';
@@ -47,10 +48,14 @@ export function JournalPage() {
 
   const goalTitle = (id: ID) => data.goals.find((g) => g.id === id)?.title;
   const taskTitle = (id: ID) => data.tasks.get(id)?.title;
-  const exportMarkdown = () => {
+  const exportMarkdown = async () => {
     const md = entriesToMarkdown(results, { timeZone: profile.timeZone, exportedOn: today, scope: describeScope(filters, data), taskTitle, goalTitle });
-    downloadText(md, exportFileName(today));
-    toast({ message: `Exported ${results.length} ${results.length === 1 ? 'entry' : 'entries'} as Markdown`, tone: 'success' });
+    try {
+      await downloadText(md, exportFileName(today));
+      toast({ message: `Exported ${results.length} ${results.length === 1 ? 'entry' : 'entries'} as Markdown`, tone: 'success' });
+    } catch (e) {
+      if (!(e instanceof SaveDeclined)) toast({ message: (e as Error).message, tone: 'error' });
+    }
   };
   const filterCount = activeFilterCount(filters);
   const view = JOURNAL_VIEWS.find((v) => v.view === filters.view)!;
@@ -59,7 +64,7 @@ export function JournalPage() {
     <div className="page page--journal">
       <PageHeader overline="Your written record" title="Journal" art="scroll" artMotion="wiggle">
         {written > 0 && (
-          <button type="button" className="btn btn--quiet" onClick={exportMarkdown} disabled={!results.length}>
+          <button type="button" className="btn btn--quiet" onClick={() => void exportMarkdown()} disabled={!results.length}>
             <Icon name="journal" size={16} /> Export Markdown
             <span className="visually-hidden"> of the {results.length} entries shown</span>
           </button>

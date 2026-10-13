@@ -1,4 +1,4 @@
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type DexieOptions, type EntityTable } from 'dexie';
 import type {
   AchievementUnlock, ContentEntry, CosmeticUnlock, EarningEntry, EntryRevision, Goal, GoalUpdate, JournalEntry, KeyValue, Milestone, PeriodDirection,
   Task, TaskMove, TaskSeries, VisionPlan, XPEvent,
@@ -29,8 +29,8 @@ export class AppDatabase extends Dexie {
   earnings!: EntityTable<EarningEntry, 'id'>;
   contentLog!: EntityTable<ContentEntry, 'id'>;
 
-  constructor(name: string) {
-    super(name);
+  constructor(name: string, options?: DexieOptions) {
+    super(name, options);
     this.version(1).stores({
       kv: 'key',
       plans: 'id, kind',

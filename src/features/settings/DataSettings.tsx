@@ -1,14 +1,16 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { SaveDeclined } from '../../app/saveFile';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toasts';
 import { useTodayKey } from '../../date/clock';
-import { dateKeyInZone, diffDays, formatMedium } from '../../date/localDate';
+import { dateKeyInZone, diffDays, formatMedium, formatTimeInZone } from '../../date/localDate';
 import type { SchemaMeta } from '../../domain/models';
 import { backupFileName, parseBackupText, previewImport, TABLE_LABEL, TABLES, type Backup, type ImportMode, type ImportPreview, type Validation } from '../../storage/backup';
-import { useProfile, useRepo, useStorage } from '../../storage/StorageProvider';
+import type { HistoryEntry } from '../../storage/cloud';
+import { useCloudStatus, useProfile, useRepo, useStorage } from '../../storage/StorageProvider';
 import { downloadText } from '../journal/journalParts';
 
 const BACKUP_NUDGE_DAYS = 7;
@@ -52,9 +54,10 @@ export function DataSettings() {
   const download = async () => {
     try {
       const backup = await repo.createBackup();
-      downloadText(JSON.stringify(backup, null, 1), backupFileName(today), 'application/json');
+      await downloadText(JSON.stringify(backup, null, 1), backupFileName(today), 'application/json');
       toast({ message: 'Backup downloaded. Keep it somewhere safe, like your cloud drive.', tone: 'success' });
     } catch (e) {
+      if (e instanceof SaveDeclined) return;
       toast({ message: (e as Error).message || 'The backup could not be made.', tone: 'error' });
     }
   };
@@ -77,13 +80,36 @@ export function DataSettings() {
   };
 
   const persistence = meta?.persistence ?? 'not-requested';
+  const cloud = useCloudStatus();
 
   return (
     <section className="settings-group" aria-labelledby="sg-data">
       <h2 id="sg-data" className="settings-group__title">
         Your data
       </h2>
-      <p className="settings-group__lede">Everything lives in this browser on this device. Nothing is sent anywhere. A backup file is how you move it or keep it safe.</p>
+      <p className="settings-group__lede">
+        {cloud.state === 'off'
+          ? 'Everything lives in this browser on this device. Nothing is sent anywhere. A backup file is how you move it or keep it safe.'
+          : 'Everything is kept in this browser and saved to your Claude account after every change, privately (only you can see it). Opening the app on another device brings it all back. The OpenRouter key stays in this browser only.'}
+      </p>
+
+      {cloud.state !== 'off' && (
+        <div className="setting">
+          <span className="setting__label">
+            Account copy
+            <span className={`setting__help ${cloud.state === 'error' || cloud.state === 'unavailable' ? 'setting__help--warn' : ''}`}>
+              {cloud.state === 'saved'
+                ? `Up to date. Last saved ${formatMedium(dateKeyInZone(new Date(cloud.at), profile.timeZone))} at ${formatTimeInZone(new Date(cloud.at), profile.timeZone)}.`
+                : cloud.state === 'saving'
+                  ? 'Saving…'
+                  : cloud.state === 'error'
+                    ? cloud.message
+                    : 'Could not reach your account in this view. Changes are only in this browser until it reconnects.'}
+            </span>
+          </span>
+        </div>
+      )}
+      {cloud.state !== 'off' && <EarlierCopies />}
 
       <div className="setting">
         <span className="setting__label">
@@ -342,5 +368,73 @@ function EraseDialog({ onClose, onBackup }: { onClose: () => void; onBackup: () 
         </label>
       </div>
     </Dialog>
+  );
+}
+
+/** Earlier account copies (one per day, and one before any save that removed a lot), each one tap from coming back. */
+function EarlierCopies() {
+  const { cloud } = useStorage();
+  const { timeZone } = useProfile();
+  const toast = useToast();
+  const [list, setList] = useState<HistoryEntry[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  if (!cloud) return null;
+
+  const load = async () => {
+    setBusy('list');
+    try {
+      setList(await cloud.earlierCopies());
+    } catch {
+      toast({ message: 'Could not reach your account. Try again in a moment.', tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restore = async (e: HistoryEntry) => {
+    setBusy(e.name);
+    try {
+      const n = await cloud.restoreEarlier(e);
+      toast({ message: n ? `Brought back ${n} record${n === 1 ? '' : 's'} from that copy.` : 'Everything in that copy is already here.', tone: 'success' });
+    } catch (err) {
+      toast({ message: (err as Error).message || 'That copy could not be brought back.', tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const when = (iso: string) => `${formatMedium(dateKeyInZone(new Date(iso), timeZone))}, ${formatTimeInZone(new Date(iso), timeZone)}`;
+
+  return (
+    <div className="setting setting--stack">
+      <span className="setting__label">
+        Earlier copies
+        <span className="setting__help">Your account keeps a copy from each day and one before any big removal, such as an erase. Bringing one back adds its records; nothing you have now is removed.</span>
+      </span>
+      {list === null ? (
+        <button type="button" className="btn btn--quiet btn--sm" onClick={() => void load()} disabled={busy === 'list'}>
+          {busy === 'list' ? 'Looking…' : 'Show earlier copies'}
+        </button>
+      ) : list.length === 0 ? (
+        <p className="setting__help">No earlier copies yet. The first one is kept with tomorrow's first save.</p>
+      ) : (
+        <ul className="earlier-copies">
+          {list.map((e) => (
+            <li key={e.name}>
+              <span>
+                {when(e.savedAt)}
+                <span className="setting__help">
+                  {e.kind === 'drop' ? 'Kept before a big removal' : 'Daily copy'}
+                  {e.records !== null ? ` · ${e.records} records` : ''}
+                </span>
+              </span>
+              <button type="button" className="btn btn--quiet btn--sm" onClick={() => void restore(e)} disabled={busy !== null}>
+                {busy === e.name ? 'Bringing back…' : 'Bring back'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

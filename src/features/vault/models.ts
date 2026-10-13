@@ -26,7 +26,7 @@ export function modelSource(outfitId: string, layeredOutfits: ReadonlySet<string
 
 /** Pictures exist for these outfits (anything else shows a color swatch). */
 export const THUMBS = new Set([
-  'initiate', 'golden-streetwear', 'city-athlete', 'tropical-runner', 'web-runner', 'showman', 'flame-rider', 'symbiote',
+  'initiate', 'golden-streetwear', 'city-athlete', 'tropical-runner', 'training-tee', 'web-runner', 'showman', 'flame-rider', 'symbiote',
   'mercenary', 'sorcerer', 'thunder-lord', 'arc-armor', 'mech-arms', 'dark-knight',
 ]);
 

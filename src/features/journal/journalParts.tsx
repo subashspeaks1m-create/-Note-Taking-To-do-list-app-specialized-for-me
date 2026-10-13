@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { saveFile } from '../../app/saveFile';
 import { useSearchParams } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { formatShort } from '../../date/localDate';
@@ -68,16 +69,9 @@ export function goalGroups(goals: Goal[], plans: VisionPlan[], selected: ID | nu
   return groups;
 }
 
-/** Saves text as a file through a temporary link. */
-export function downloadText(text: string, fileName: string, type = 'text/markdown;charset=utf-8') {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+/** Saves text as a file (through the save prompt inside the Claude app link). */
+export function downloadText(text: string, fileName: string, type = 'text/markdown;charset=utf-8'): Promise<void> {
+  return saveFile(text, fileName, type);
 }
 
 export function readingHref(id: ID, search: string): string {

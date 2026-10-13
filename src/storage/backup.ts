@@ -50,14 +50,14 @@ export interface Backup {
 }
 
 /** Key-value rows that belong to this device's install, never imported over the current ones. */
-const LOCAL_ONLY_KV = new Set(['meta', 'preImportBackup']);
+const LOCAL_ONLY_KV = new Set(['meta', 'preImportBackup', 'cloudBase']);
 
 export async function exportBackup(db: AppDatabase, now: Date): Promise<Backup> {
   const tables = {} as Record<TableName, Row[]>;
   await db.transaction('r', TABLES.map((t) => db.table(t)), async () => {
     for (const t of TABLES) {
       const rows = (await db.table(t).toArray()) as Row[];
-      tables[t] = t === 'kv' ? rows.filter((r) => r.key !== 'preImportBackup') : rows;
+      tables[t] = t === 'kv' ? rows.filter((r) => r.key !== 'preImportBackup' && r.key !== 'cloudBase') : rows;
     }
   });
   return { format: BACKUP_FORMAT, formatVersion: BACKUP_FORMAT_VERSION, schemaVersion: SCHEMA_VERSION, exportedAt: now.toISOString(), app: 'Pursuit of Greatness', tables };
