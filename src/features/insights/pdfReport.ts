@@ -139,8 +139,7 @@ class Doc {
       this.text(k.value, x + 4, y + 14);
       const c = k.trend === 'up' ? UP : k.trend === 'down' ? DOWN : MUTED;
       this.font(8, 'normal', c);
-      const arrow = k.trend === 'up' ? '+ ' : k.trend === 'down' ? '- ' : '';
-      const line = this.lines(`${arrow && !/^[+-]/.test(k.change) ? arrow : ''}${k.change}`, w - 8)[0] ?? '';
+      const line = this.lines(k.change, w - 8)[0] ?? '';
       this.pdf.text(line, x + 4, y + 20);
     });
     this.y += Math.ceil(items.length / cols) * (h + gap) + 2;
