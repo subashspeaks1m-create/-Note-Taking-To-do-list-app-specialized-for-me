@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { SaveDeclined } from '../../app/saveFile';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '../../components/Dialog';
@@ -52,9 +53,10 @@ export function DataSettings() {
   const download = async () => {
     try {
       const backup = await repo.createBackup();
-      downloadText(JSON.stringify(backup, null, 1), backupFileName(today), 'application/json');
+      await downloadText(JSON.stringify(backup, null, 1), backupFileName(today), 'application/json');
       toast({ message: 'Backup downloaded. Keep it somewhere safe, like your cloud drive.', tone: 'success' });
     } catch (e) {
+      if (e instanceof SaveDeclined) return;
       toast({ message: (e as Error).message || 'The backup could not be made.', tone: 'error' });
     }
   };

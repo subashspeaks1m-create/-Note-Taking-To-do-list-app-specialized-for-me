@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Art } from '../../components/art/Art';
 import { Link } from 'react-router-dom';
+import { SaveDeclined, saveFile } from '../../app/saveFile';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toasts';
 import { addDays, compareKeys, formatShort, type DateKey, type WeekStart } from '../../date/localDate';
 import type { PeriodDirection } from '../../domain/models';
 import { periodKeyFor, periodRange, previousRange, type ActivitySource } from '../../domain/stats';
-import { useDirection } from '../../storage/queries';
+import { useCoachNote, useContentLog, useDirection, useEarnings } from '../../storage/queries';
 import { useRepo } from '../../storage/StorageProvider';
 import { CoachPanel } from '../coach/CoachPanel';
 import type { CoachGoal } from '../coach/coachPrompt';
+import type { GoalView } from '../visions/boardModel';
 import { ReportCard, svgToPng } from './ReportCard';
 import { reportKey } from './reportInbox';
 import { buildReport, type ReportKind } from './reportModel';
@@ -25,10 +27,11 @@ interface Props {
   name: string;
   goalsBehind: string[];
   coachGoals: CoachGoal[];
+  goalViews: GoalView[];
   markSeen: (key: string) => void;
 }
 
-export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, weekStart, name, goalsBehind, coachGoals, markSeen }: Props) {
+export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, weekStart, name, goalsBehind, coachGoals, goalViews, markSeen }: Props) {
   const report = useMemo(() => buildReport(source, kind, anchor, today, weekStart, minutesNow), [source, kind, anchor, today, weekStart, minutesNow]);
   const { range } = report;
   const nextRange = periodRange(kind, addDays(range.end, 1), weekStart);
@@ -38,6 +41,10 @@ export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, 
   const cardRef = useRef<SVGSVGElement>(null);
   const toast = useToast();
   const [exporting, setExporting] = useState(false);
+  const [makingPdf, setMakingPdf] = useState(false);
+  const earnings = useEarnings();
+  const content = useContentLog();
+  const coachNote = useCoachNote(kind, range.start);
   const canGoNext = compareKeys(nextRange.start, today) <= 0;
   const label = kind === 'week' ? 'week' : 'month';
 
@@ -50,19 +57,43 @@ export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, 
     setExporting(true);
     try {
       const blob = await svgToPng(cardRef.current, 1);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pursuit-${kind}-report-${periodKeyFor(kind, range)}.png`;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 5_000);
+      await saveFile(blob, `pursuit-${kind}-report-${periodKeyFor(kind, range)}.png`);
       toast({ message: 'Report saved as PNG', tone: 'success' });
     } catch (e) {
+      if (e instanceof SaveDeclined) return;
       toast({ message: (e as Error).message, tone: 'error' });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const exportPdf = async () => {
+    setMakingPdf(true);
+    try {
+      const [{ buildPdfData }, { renderReportPdf }] = await Promise.all([import('./pdfModel'), import('./pdfReport')]);
+      const data = buildPdfData({
+        kind,
+        report,
+        name,
+        today,
+        tasks: source.tasks,
+        entries: source.entries,
+        goals: goalViews,
+        earnings: earnings ?? [],
+        content: content ?? [],
+        focus: direction?.intention ?? '',
+        review: direction?.review ?? '',
+        blockers: direction?.blockers ?? '',
+        nextFocus: nextDirection?.intention ?? '',
+        coachText: coachNote?.text ?? null,
+      });
+      await saveFile(await renderReportPdf(data), data.fileName);
+      toast({ message: `${kind === 'week' ? 'Weekly' : 'Monthly'} report saved as PDF`, tone: 'success' });
+    } catch (e) {
+      if (e instanceof SaveDeclined) return;
+      toast({ message: (e as Error).message || 'The PDF could not be made.', tone: 'error' });
+    } finally {
+      setMakingPdf(false);
     }
   };
 
@@ -86,7 +117,10 @@ export function ReportView({ kind, anchor, onAnchor, source, today, minutesNow, 
         <span className={`report__state ${report.ready ? 'is-ready' : ''}`}>
           {report.ready ? 'Ready' : `In progress · ready ${formatShort(range.end)}, 6 pm`}
         </span>
-        <button type="button" className="btn btn--primary btn--sm report__export" onClick={() => void exportPng()} disabled={exporting}>
+        <button type="button" className="btn btn--primary btn--sm report__export" onClick={() => void exportPdf()} disabled={makingPdf}>
+          <Icon name="download" size={14} /> {makingPdf ? 'Making PDF…' : 'Save full report (PDF)'}
+        </button>
+        <button type="button" className="btn btn--quiet btn--sm" onClick={() => void exportPng()} disabled={exporting}>
           <Icon name="sparkle" size={14} /> {exporting ? 'Saving…' : 'Save as PNG'}
         </button>
       </div>

@@ -25,6 +25,7 @@
     "dexie": "^4.4.6",
     "dexie-react-hooks": "^4.4.0",
     "fake-indexeddb": "^6.2.5",
+    "jspdf": "^4.2.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",

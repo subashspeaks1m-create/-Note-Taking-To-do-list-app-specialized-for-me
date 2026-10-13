@@ -84,6 +84,7 @@ export function InsightsPage() {
           name={profile.displayName}
           goalsBehind={goalsBehind}
           coachGoals={coachGoals}
+          goalViews={goals}
           markSeen={inbox.markSeen}
         />
       )}
