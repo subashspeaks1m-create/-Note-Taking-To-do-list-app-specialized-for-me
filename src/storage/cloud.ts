@@ -394,6 +394,12 @@ export class CloudSync {
     }
     await this.run(async () => {
       if (!this.pulled) return this.pull();
+      // The sync marker vanished: the browser emptied this page's storage while it was open.
+      // Refill from the account instead of saving the empty database over it.
+      if (!(await this.syncBase())) {
+        this.pulled = false;
+        return this.pull();
+      }
       const mine = await this.local();
       if (mine.hash === this.lastHash) {
         if (this.status.state === 'saving' && this.manifest) this.set({ state: 'saved', at: this.manifest.savedAt });

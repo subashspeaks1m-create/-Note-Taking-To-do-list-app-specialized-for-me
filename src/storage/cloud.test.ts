@@ -33,7 +33,10 @@ async function device(cloud: FakeCloud) {
   open.push(db);
   const repo = new Repository(db, () => clock);
   await repo.ensureInitialized();
-  const sync = new CloudSync(db, new CloudSpace(cloud, 'data/users/u1'), () => clock, () => repo.dedupeStarterPlans());
+  const sync = new CloudSync(db, new CloudSpace(cloud, 'data/users/u1'), () => clock, async () => {
+    await repo.ensureInitialized();
+    await repo.dedupeStarterPlans();
+  });
   return { db, repo, sync };
 }
 
@@ -169,6 +172,43 @@ describe('account sync', () => {
     const b = await device(cloud);
     await b.sync.initial();
     expect(await titles(b.db)).toEqual(['Four', 'One', 'Three', 'Two']);
+  });
+
+  it('storage emptied under the open page is refilled from the account, not saved over it', async () => {
+    const cloud = new FakeCloud();
+    const a = await device(cloud);
+    await a.sync.initial();
+    for (const t of ['One', 'Two']) await a.repo.addTask({ title: t, category: 'doing', scheduledDate: '2026-10-12' });
+    await a.repo.addEarning({ dateKey: '2026-10-12', amount: 90 });
+    await a.sync.flush();
+
+    // The browser drops the page's storage; the database comes back with nothing in it, not even its markers.
+    await a.db.transaction('rw', a.db.tables, async () => {
+      for (const t of a.db.tables) await t.clear();
+    });
+    await a.sync.flush();
+    expect(await titles(a.db)).toEqual(['One', 'Two']);
+    expect(await a.db.earnings.count()).toBe(1);
+    expect(await a.db.kv.get('meta')).toBeTruthy();
+    expect((await a.db.plans.toArray()).length).toBe(3);
+
+    const b = await device(cloud);
+    await b.sync.initial();
+    expect(await titles(b.db)).toEqual(['One', 'Two']);
+  });
+
+  it('a deliberate erase still reaches the account', async () => {
+    const cloud = new FakeCloud();
+    const a = await device(cloud);
+    await a.sync.initial();
+    await a.repo.addTask({ title: 'Gone', category: 'doing', scheduledDate: '2026-10-12' });
+    await a.sync.flush();
+    await a.repo.eraseAll();
+    await a.sync.flush();
+    expect(await titles(a.db)).toEqual([]);
+    const b = await device(cloud);
+    await b.sync.initial();
+    expect(await titles(b.db)).toEqual([]);
   });
 
   it('a device holding data is never wiped by an emptier account copy', async () => {

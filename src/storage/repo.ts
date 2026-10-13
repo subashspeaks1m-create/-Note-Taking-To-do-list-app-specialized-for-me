@@ -96,7 +96,7 @@ export interface CoachNote {
 
 export const coachNoteKey = (kind: 'week' | 'month', start: DateKey) => `coach:${kind}:${start}`;
 
-const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', wearing: 'wearing', platform: 'platform', principles: 'principles', preImport: 'preImportBackup' } as const;
+const KV = { profile: 'profile', meta: 'meta', outfit: 'outfit', wearing: 'wearing', platform: 'platform', principles: 'principles', preImport: 'preImportBackup', cloudBase: 'cloudBase' } as const;
 
 /**
  * Typed storage operations. Components call these instead of touching
@@ -118,7 +118,11 @@ export class Repository {
 
   // ---------- Setup ----------
 
-  /** Creates the profile, metadata and the three original plans exactly once. */
+  /**
+   * Creates the profile, metadata and the three original plans exactly once.
+   * Also safe after storage was emptied and refilled from the account: only
+   * what is missing is added, nothing already there is overwritten.
+   */
   async ensureInitialized(): Promise<void> {
     await this.db.transaction('rw', this.db.kv, this.db.plans, async () => {
       const existing = await this.db.kv.get(KV.meta);
@@ -147,11 +151,10 @@ export class Repository {
         createdAt: at,
         updatedAt: at,
       }));
-      await this.db.kv.bulkPut([
-        { key: KV.meta, value: meta },
-        { key: KV.profile, value: profile },
-      ]);
-      await this.db.plans.bulkAdd(plans);
+      await this.db.kv.put({ key: KV.meta, value: meta });
+      if (!(await this.db.kv.get(KV.profile))) await this.db.kv.put({ key: KV.profile, value: profile });
+      const have = new Set(await this.db.plans.toCollection().primaryKeys());
+      await this.db.plans.bulkAdd(plans.filter((p) => !have.has(p.id)));
     });
   }
 
@@ -292,7 +295,10 @@ export class Repository {
   /** Erases every record on this device, then starts fresh with the original plans. */
   async eraseAll(): Promise<void> {
     await this.db.transaction('rw', TABLES.map((t) => this.db.table(t)), async () => {
+      // Keeps the account-sync marker, so the empty state is saved as a deliberate erase, not mistaken for lost storage.
+      const base = await this.db.kv.get(KV.cloudBase);
       for (const t of TABLES) await this.db.table(t).clear();
+      if (base) await this.db.kv.put(base);
     });
     await this.ensureInitialized();
   }

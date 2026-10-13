@@ -131,7 +131,10 @@ export function StorageProvider({ children, dbName = REAL_DB_NAME }: { children:
         if (closeIfCancelled()) return;
         if (!space) setCloudUnavailable(true);
         else {
-          sync = new CloudSync(db, space, now, () => repo.dedupeStarterPlans());
+          sync = new CloudSync(db, space, now, async () => {
+            await repo.ensureInitialized();
+            await repo.dedupeStarterPlans();
+          });
           // If the account can't be reached, this keeps retrying in the background and saves nothing over it first.
           // The app opens after a short wait either way, so a slow connection never leaves it stuck on the logo.
           await Promise.race([sync.initial(), sleep(CLOUD_WAIT_MS)]);
