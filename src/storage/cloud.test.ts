@@ -147,4 +147,69 @@ describe('account sync', () => {
     expect(await b.db.plans.count()).toBe(3);
     expect(await a.repo.dedupeStarterPlans()).toBe(0);
   });
+
+  it('an erase keeps the copy before it, and that copy brings everything back', async () => {
+    const cloud = new FakeCloud();
+    const a = await device(cloud);
+    await a.sync.initial();
+    for (const t of ['One', 'Two', 'Three', 'Four']) await a.repo.addTask({ title: t, category: 'doing', scheduledDate: '2026-10-12' });
+    await a.sync.flush();
+    await a.repo.eraseAll();
+    await a.sync.flush();
+    expect(await titles(a.db)).toEqual([]);
+
+    const copies = await a.sync.earlierCopies();
+    const drop = copies.find((c) => c.kind === 'drop');
+    expect(drop?.records).toBeGreaterThanOrEqual(7);
+    await a.sync.restoreEarlier(drop!);
+    expect(await titles(a.db)).toEqual(['Four', 'One', 'Three', 'Two']);
+    expect((await a.db.plans.toArray()).length).toBe(3);
+
+    // The restored data reached the account too.
+    const b = await device(cloud);
+    await b.sync.initial();
+    expect(await titles(b.db)).toEqual(['Four', 'One', 'Three', 'Two']);
+  });
+
+  it('a device holding data is never wiped by an emptier account copy', async () => {
+    const cloud = new FakeCloud();
+    const a = await device(cloud);
+    await a.sync.initial();
+    await a.repo.addTask({ title: 'Kept on phone', category: 'doing', scheduledDate: '2026-10-12' });
+    await a.sync.flush();
+
+    // Another device erases everything and saves.
+    const b = await device(cloud);
+    await b.sync.initial();
+    await b.repo.eraseAll();
+    await b.sync.flush();
+
+    // The phone opens again, untouched since its last save: it keeps its task and puts it back in the account.
+    const again = new CloudSync(a.db, new CloudSpace(cloud, 'data/users/u1'), () => clock, () => a.repo.dedupeStarterPlans());
+    await again.initial();
+    expect(await titles(a.db)).toEqual(['Kept on phone']);
+    const c = await device(cloud);
+    await c.sync.initial();
+    expect(await titles(c.db)).toEqual(['Kept on phone']);
+  });
+
+  it('never writes over an account copy it could not read', async () => {
+    const cloud = new FakeCloud();
+    const a = await device(cloud);
+    await a.sync.initial();
+    await a.repo.addTask({ title: 'Precious', category: 'doing', scheduledDate: '2026-10-12' });
+    await a.sync.flush();
+    const manifest = structuredClone(cloud.docs.get('data/users/u1/manifest'));
+    // The saved pieces go missing for a moment (a failed read).
+    const pieces = [...cloud.docs.keys()].filter((k) => /\/[ab]-\d+$/.test(k));
+    const saved = new Map(pieces.map((k) => [k, cloud.docs.get(k)!]));
+    for (const k of pieces) cloud.docs.delete(k);
+
+    const b = await device(cloud);
+    await b.sync.initial();
+    expect(b.sync.getStatus().state).toBe('error');
+    expect(cloud.docs.get('data/users/u1/manifest')).toEqual(manifest);
+    b.sync.stop();
+    for (const [k, v] of saved) cloud.docs.set(k, v);
+  });
 });

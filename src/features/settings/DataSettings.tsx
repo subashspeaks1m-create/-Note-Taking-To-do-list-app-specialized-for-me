@@ -9,6 +9,7 @@ import { useTodayKey } from '../../date/clock';
 import { dateKeyInZone, diffDays, formatMedium, formatTimeInZone } from '../../date/localDate';
 import type { SchemaMeta } from '../../domain/models';
 import { backupFileName, parseBackupText, previewImport, TABLE_LABEL, TABLES, type Backup, type ImportMode, type ImportPreview, type Validation } from '../../storage/backup';
+import type { HistoryEntry } from '../../storage/cloud';
 import { useCloudStatus, useProfile, useRepo, useStorage } from '../../storage/StorageProvider';
 import { downloadText } from '../journal/journalParts';
 
@@ -108,6 +109,7 @@ export function DataSettings() {
           </span>
         </div>
       )}
+      {cloud.state !== 'off' && <EarlierCopies />}
 
       <div className="setting">
         <span className="setting__label">
@@ -366,5 +368,73 @@ function EraseDialog({ onClose, onBackup }: { onClose: () => void; onBackup: () 
         </label>
       </div>
     </Dialog>
+  );
+}
+
+/** Earlier account copies (one per day, and one before any save that removed a lot), each one tap from coming back. */
+function EarlierCopies() {
+  const { cloud } = useStorage();
+  const { timeZone } = useProfile();
+  const toast = useToast();
+  const [list, setList] = useState<HistoryEntry[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  if (!cloud) return null;
+
+  const load = async () => {
+    setBusy('list');
+    try {
+      setList(await cloud.earlierCopies());
+    } catch {
+      toast({ message: 'Could not reach your account. Try again in a moment.', tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const restore = async (e: HistoryEntry) => {
+    setBusy(e.name);
+    try {
+      const n = await cloud.restoreEarlier(e);
+      toast({ message: n ? `Brought back ${n} record${n === 1 ? '' : 's'} from that copy.` : 'Everything in that copy is already here.', tone: 'success' });
+    } catch (err) {
+      toast({ message: (err as Error).message || 'That copy could not be brought back.', tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const when = (iso: string) => `${formatMedium(dateKeyInZone(new Date(iso), timeZone))}, ${formatTimeInZone(new Date(iso), timeZone)}`;
+
+  return (
+    <div className="setting setting--stack">
+      <span className="setting__label">
+        Earlier copies
+        <span className="setting__help">Your account keeps a copy from each day and one before any big removal, such as an erase. Bringing one back adds its records; nothing you have now is removed.</span>
+      </span>
+      {list === null ? (
+        <button type="button" className="btn btn--quiet btn--sm" onClick={() => void load()} disabled={busy === 'list'}>
+          {busy === 'list' ? 'Looking…' : 'Show earlier copies'}
+        </button>
+      ) : list.length === 0 ? (
+        <p className="setting__help">No earlier copies yet. The first one is kept with tomorrow's first save.</p>
+      ) : (
+        <ul className="earlier-copies">
+          {list.map((e) => (
+            <li key={e.name}>
+              <span>
+                {when(e.savedAt)}
+                <span className="setting__help">
+                  {e.kind === 'drop' ? 'Kept before a big removal' : 'Daily copy'}
+                  {e.records !== null ? ` · ${e.records} records` : ''}
+                </span>
+              </span>
+              <button type="button" className="btn btn--quiet btn--sm" onClick={() => void restore(e)} disabled={busy !== null}>
+                {busy === e.name ? 'Bringing back…' : 'Bring back'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
