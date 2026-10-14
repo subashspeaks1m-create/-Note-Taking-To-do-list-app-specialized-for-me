@@ -53,6 +53,8 @@ export interface BookSource {
   pages: string[];
   chapters: Chapter[];
   pdf?: Blob;
+  /** Condensed notes for models that can't read the whole book at once. */
+  notes?: { key: string; text: string };
 }
 
 class BooksDatabase extends Dexie {

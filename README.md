@@ -32,11 +32,22 @@ The text is read on your device with pdf.js. When you click **Analyze**, Claude 
 - **7-day and 30-day roadmaps**: dated daily checklists with evening check-ins. Today's actions
   from every active plan also appear at the top of the Books page.
 
-Add your Claude API key under **Settings → Book analysis**. The key stays in this browser and
-requests go straight to Anthropic. Before analyzing you can set your goal for the book (it shapes
-the insights and plans) and the page range, and you see an estimated token count and cost. The
-book is sent once and cached, so the later sections cost less. Scanned PDFs without a text layer
-are sent as page images (up to 22 MB and 600 pages). Everything can be exported as Markdown.
+Pick a provider under **Settings → Book analysis (AI)** and paste its key. Keys stay in this
+browser and requests go straight to the provider.
+
+- **OpenRouter** (default): free models work with a free key from openrouter.ai/settings/keys.
+  Allow free providers at openrouter.ai/settings/privacy. The app picks the best free model (JSON
+  support first, then the largest context) or you can choose one. When a book is bigger than the
+  model can read at once, it is read in parts and condensed into notes first. Free accounts get
+  about 50 free-model requests a day; one book takes 5 requests plus one per part.
+- **Claude** (Anthropic): Opus 5.5, Sonnet 5.5 or Haiku 5.5 with structured outputs. The book is
+  sent once and cached, so later sections cost less. Scanned PDFs without a text layer are sent as
+  page images (up to 22 MB and 600 pages).
+
+Before analyzing you can set your goal for the book (it shapes the insights and plans) and the
+page range. Everything can be exported as Markdown.
+
+Deployed on Vercel (`vercel.json` rewrites every route to the app).
 
 ## Stack
 

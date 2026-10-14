@@ -5,7 +5,7 @@ import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/Page';
 import { useTodayKey } from '../../date/clock';
 import { PROFILE_DEFAULTS } from '../../domain/config';
-import { useAiSettings } from './aiSettings';
+import { hasKey, useAiSettings } from './aiSettings';
 import { booksDb, type BookRecord } from './db';
 import { extractBook } from './extract';
 import { actionKey, currentDay, planStats } from './planMath';
@@ -24,10 +24,10 @@ export function LibraryPage() {
       <PageHeader overline="Learning is changing behavior" title="Books" />
       <p className="page-lede">Upload a book. Get the summary, a mind map, the insights that change behavior, and 7-day and 30-day roadmaps you can check off.</p>
 
-      {!settings.apiKey && (
+      {!hasKey(settings) && (
         <div className="notice" role="note">
           <Icon name="sparkle" size={18} />
-          <span>Add your Claude API key to analyze books.</span>
+          <span>Add your {settings.provider === 'openrouter' ? 'OpenRouter' : 'Claude'} API key in Settings to analyze books.</span>
           <Link to="/settings#ai" className="btn btn--quiet btn--sm">
             Open settings
           </Link>

@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useDisplayPrefs, type DisplayPrefs } from '../../app/displayPrefs';
 import { PageHeader, StageNote } from '../../components/Page';
 import { APP_NAME, PROFILE_DEFAULTS } from '../../domain/config';
@@ -22,6 +24,10 @@ function Choice<K extends keyof DisplayPrefs>({ label, prefKey, options }: { lab
 }
 
 export function SettingsPage() {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [hash]);
   return (
     <div className="page page--narrow">
       <PageHeader overline={APP_NAME} title="Settings" />
@@ -56,7 +62,7 @@ export function SettingsPage() {
 
       <section id="ai" className="settings-group" aria-labelledby="sg-ai">
         <h2 id="sg-ai" className="settings-group__title">
-          Book analysis (Claude)
+          Book analysis (AI)
         </h2>
         <AiSettingsForm />
       </section>

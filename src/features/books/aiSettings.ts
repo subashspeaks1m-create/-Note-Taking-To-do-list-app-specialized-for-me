@@ -1,16 +1,22 @@
 import { useSyncExternalStore } from 'react';
 
 /**
- * Claude settings for book analysis. The API key stays in this browser's
- * localStorage and is only ever sent to api.anthropic.com.
+ * AI settings for book analysis. Keys stay in this browser's localStorage and
+ * are only ever sent to the provider they belong to.
  */
+export type Provider = 'openrouter' | 'anthropic';
 export type ModelId = 'claude-opus-5-5' | 'claude-sonnet-5-5' | 'claude-haiku-5-5';
 export type Depth = 'medium' | 'high';
 
 export interface AiSettings {
+  provider: Provider;
+  /** Anthropic API key. */
   apiKey: string;
   model: ModelId;
   depth: Depth;
+  openrouterKey: string;
+  /** OpenRouter model id; empty means "pick the best free model". */
+  openrouterModel: string;
 }
 
 export const MODELS: readonly { id: ModelId; label: string; blurb: string; inputPerM: number; outputPerM: number; cacheReadPerM: number }[] = [
@@ -20,7 +26,7 @@ export const MODELS: readonly { id: ModelId; label: string; blurb: string; input
 ];
 
 const KEY = 'pog.books.ai.v1';
-const DEFAULTS: AiSettings = { apiKey: '', model: 'claude-opus-5-5', depth: 'high' };
+const DEFAULTS: AiSettings = { provider: 'openrouter', apiKey: '', model: 'claude-opus-5-5', depth: 'high', openrouterKey: '', openrouterModel: '' };
 
 let current: AiSettings = read();
 const listeners = new Set<() => void>();
@@ -57,14 +63,19 @@ export function useAiSettings(): AiSettings {
   return useSyncExternalStore(subscribe, getAiSettings, getAiSettings);
 }
 
-/** Rough token estimate for the newer tokenizer (~3.6 characters per token for English prose). */
+/** True when the selected provider has a key. */
+export function hasKey(settings: AiSettings): boolean {
+  return settings.provider === 'openrouter' ? !!settings.openrouterKey : !!settings.apiKey;
+}
+
+/** Rough token estimate (~3.6 characters per token for English prose). */
 export function estimateTokens(chars: number): number {
   return Math.ceil(chars / 3.6);
 }
 
 /**
- * Approximate cost of a full analysis: one cache write of the book, four cache
- * reads, plus generated output (including thinking) across five sections.
+ * Approximate Claude cost of a full analysis: one cache write of the book, four
+ * cache reads, plus generated output (including thinking) across five sections.
  */
 export function estimateCost(bookTokens: number, model: ModelId): number {
   const m = MODELS.find((x) => x.id === model) ?? MODELS[0]!;
@@ -72,4 +83,12 @@ export function estimateCost(bookTokens: number, model: ModelId): number {
   const reads = (bookTokens * 4 * m.cacheReadPerM) / 1e6;
   const output = (60_000 * m.outputPerM) / 1e6;
   return write + reads + output;
+}
+
+/** Short display name for a stored model id. */
+export function modelLabel(id: string | undefined): string {
+  if (!id) return '';
+  const claude = MODELS.find((m) => m.id === id);
+  if (claude) return claude.label;
+  return id.replace(/^[^/]+\//, '').replace(/:free$/, ' (free)');
 }

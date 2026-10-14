@@ -17,9 +17,9 @@ How you work:
 - If the reader shared a goal, tailor insights and plans to it without distorting what the book says.`;
 
 /** The book text with page and chapter markers, limited to the chosen page range. */
-export function bookText(book: BookRecord, source: BookSource): string {
-  const from = Math.max(1, book.range.from);
-  const to = Math.min(source.pages.length, book.range.to);
+export function bookText(book: BookRecord, source: BookSource, range = book.range): string {
+  const from = Math.max(1, range.from);
+  const to = Math.min(source.pages.length, range.to);
   const chapterAt = new Map(source.chapters.map((c) => [c.page, c.title]));
   const parts: string[] = [];
   for (let p = from; p <= to; p++) {
@@ -86,6 +86,7 @@ Cover the entire book; the map should let someone recall its full structure at a
 - weeks: exactly 4 entries. Week 1 installs the keystone habit at a tiny size; week 2 adds the next most important behaviors; week 3 applies them in harder, real situations; week 4 (days 22–30) integrates everything into identity and routine. Each week has a focus and a measurable milestone.
 - days: exactly 30 entries, day 1 to 30, each with a theme, why, 1–3 actions and an evening reflection question. Days 7, 14, 21 and 28 include a short weekly review. Day 30 is a retrospective with next steps.
 - actions: specific and checkable; minutes realistic; keep each day under 60 minutes. kind is "do", "reflect" or "learn" (name the pages to revisit).
+- Keep every string brief (actions under 20 words) so all 30 days fit.
 - successSigns: 4–8 observable signs that behavior actually changed.`,
 };
 
@@ -95,4 +96,27 @@ export function taskPrompt(section: SectionId, book: BookRecord, insights?: Book
     parts.push(`Insights already extracted from this book:\n<insights>\n${JSON.stringify(insights)}\n</insights>`);
   }
   return parts.join('\n\n');
+}
+
+/** Asks a model to condense one part of a long book into study notes. */
+export function notesPrompt(book: BookRecord, part: number, parts: number, from: number, to: number): string {
+  return `This is part ${part} of ${parts} of "${book.title}" (pages ${from}–${to}). The book is too long to read at once, so write study notes on this part that keep everything needed later to summarize the whole book, build a mind map, and extract behavior-changing insights.
+
+- Use a heading for each chapter or section, with its page numbers.
+- Under each, list every key idea, framework, step, example, story and number, as specific bullets.
+- Copy the most memorable lines word for word in quotes, with [Page N].
+- Aim for 1,200–2,500 words. Write only the notes.`;
+}
+
+/** Wraps condensed notes so section prompts know what they are reading. */
+export function notesMaterial(book: BookRecord, notes: string): string {
+  return `<book_notes title="${escapeAttr(book.title)}"${book.author ? ` author="${escapeAttr(book.author)}"` : ''}>
+These are detailed notes of the whole book, written part by part because the book is longer than you can read at once. Page markers refer to the original book.
+
+${notes}
+</book_notes>`;
+}
+
+export function jsonInstruction(schema: object): string {
+  return `Reply with only one JSON object, no other text. It must follow this JSON Schema:\n${JSON.stringify(schema)}`;
 }

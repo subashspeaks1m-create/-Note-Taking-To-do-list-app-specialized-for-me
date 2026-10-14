@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { BookRecord } from './db';
+import { planReading } from './material';
 import { bookToMarkdown } from './markdown';
+import { extractJson, IncompleteResultError, normalizeSection, sectionJsonSchema } from './normalize';
+import { rankFreeModels, toOrModel } from './openrouter';
 import { layoutMindMap, wrap } from './mindMapLayout';
 import { actionKey, currentDay, dayDone, planStats, weekOfDay } from './planMath';
 import { bookText } from './prompts';
@@ -129,5 +132,65 @@ describe('markdown export', () => {
     expect(md).toContain('- **Identity**: Become the person');
     expect(md).toContain('- [x] a (5 min, do)');
     expect(md).toContain('- [ ] b (10 min, reflect)');
+  });
+});
+
+describe('free-model output handling', () => {
+  it('extracts JSON from thinking tags, fences and prose', () => {
+    expect(extractJson('<think>hmm {no}</think>Sure!\n```json\n{"a": [1, 2,],}\n```')).toEqual({ a: [1, 2] });
+    expect(() => extractJson('no json here')).toThrow(IncompleteResultError);
+  });
+
+  it('coerces loose plans and renumbers days', () => {
+    const raw = { plan: { goal: 'G', days: Array.from({ length: 7 }, (_, i) => ({ day: 'x', theme: `T${i}`, actions: [{ text: 'Walk', minutes: '15', kind: 'DO' }, 'Journal', null] })) } };
+    const plan = normalizeSection('plan7', raw);
+    expect(plan.days.map((d) => d.day)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(plan.days[0]!.actions).toEqual([
+      { text: 'Walk', minutes: 15, kind: 'do' },
+      { text: 'Journal', minutes: 10, kind: 'do' },
+    ]);
+  });
+
+  it('rejects results with too little content', () => {
+    expect(() => normalizeSection('plan30', { days: [{ theme: 'a' }] })).toThrow(IncompleteResultError);
+    expect(() => normalizeSection('mindmap', { center: 'x', branches: [] })).toThrow(IncompleteResultError);
+  });
+
+  it('fills defaults for odd insight fields', () => {
+    const r = normalizeSection('insights', { insights: [{ title: 'Do it', area: 'Spirituality', impact: 'HIGH' }] });
+    expect(r.insights[0]).toMatchObject({ title: 'Do it', area: 'other', impact: 'high', effort: 'moderate', idea: '' });
+    expect(r.startDoing).toEqual([]);
+  });
+
+  it('builds strict JSON schemas', () => {
+    const s = sectionJsonSchema('mindmap') as { additionalProperties: boolean; required: string[] };
+    expect(s.additionalProperties).toBe(false);
+    expect(s.required).toEqual(['center', 'branches']);
+  });
+});
+
+describe('reading plan', () => {
+  const pages = Array.from({ length: 300 }, () => 'x'.repeat(2000));
+  it('sends the whole book when it fits', () => {
+    expect(planReading(pages, { from: 1, to: 300 }, 1_000_000, 0)).toEqual({ direct: true, parts: [{ from: 1, to: 300 }] });
+  });
+  it('splits into contiguous parts for small contexts', () => {
+    const plan = planReading(pages, { from: 11, to: 300 }, 64_000, 8_000);
+    expect(plan.direct).toBe(false);
+    expect(plan.parts[0]!.from).toBe(11);
+    expect(plan.parts.at(-1)!.to).toBe(300);
+    plan.parts.slice(1).forEach((p, i) => expect(p.from).toBe(plan.parts[i]!.to + 1));
+  });
+});
+
+describe('openrouter models', () => {
+  it('ranks free models with JSON support and big context first', () => {
+    const models = [
+      toOrModel({ id: 'a/small:free', context_length: 32_000, supported_parameters: ['response_format'] }),
+      toOrModel({ id: 'b/big:free', context_length: 1_000_000, supported_parameters: [] }),
+      toOrModel({ id: 'c/paid', context_length: 2_000_000, pricing: { prompt: '0.000001', completion: '0.000002' } }),
+      toOrModel({ id: 'd/mid', context_length: 128_000, pricing: { prompt: '0', completion: '0' }, supported_parameters: ['structured_outputs'] }),
+    ];
+    expect(rankFreeModels(models).map((m) => m.id)).toEqual(['d/mid', 'a/small:free', 'b/big:free']);
   });
 });

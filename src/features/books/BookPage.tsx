@@ -3,12 +3,14 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { EmptyState } from '../../components/Page';
-import { estimateCost, estimateTokens, MODELS, useAiSettings } from './aiSettings';
+import { estimateCost, estimateTokens, hasKey, MODELS, modelLabel, useAiSettings } from './aiSettings';
 import { AiSettingsForm } from './AiSettingsForm';
 import { booksDb, deleteBook, updateBook, type BookRecord } from './db';
 import { InsightsView } from './InsightsView';
 import { bookToMarkdown, downloadText, safeFileName } from './markdown';
+import { planReading } from './material';
 import { MindMapView } from './MindMapView';
+import { useOpenRouterModels } from './openrouter';
 import { PlanView } from './PlanView';
 import { runAnalysis, stopAnalysis, useLiveRun } from './runner';
 import { SECTION_IDS, SECTION_LABELS, type SectionId } from './schema';
@@ -25,7 +27,8 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function BookPage() {
   const { bookId = '' } = useParams();
-  const book = useLiveQuery(() => booksDb.books.get(bookId), [bookId]);
+  // `null` once loaded and missing; `undefined` only while loading.
+  const book = useLiveQuery(async () => (await booksDb.books.get(bookId)) ?? null, [bookId]);
   const live = useLiveRun(bookId);
   const [params, setParams] = useSearchParams();
   const [setupOpen, setSetupOpen] = useState(false);
@@ -86,7 +89,7 @@ export function BookPage() {
 function BookHeader({ book, onSetup, setupOpen }: { book: BookRecord; onSetup: () => void; setupOpen: boolean }) {
   const navigate = useNavigate();
   const anyDone = SECTION_IDS.some((s) => book.sections[s]?.status === 'done');
-  const model = MODELS.find((m) => m.id === book.model)?.label;
+  const model = modelLabel(book.model);
   return (
     <header className="book-head">
       <Link to="/books" className="book-head__back">
@@ -142,11 +145,23 @@ function AnalyzePanel({ book, onStarted }: { book: BookRecord; onStarted: () => 
   const [error, setError] = useState<string | null>(null);
   const anyDone = SECTION_IDS.some((s) => book.sections[s]?.status === 'done');
 
+  const openrouter = settings.provider === 'openrouter';
+  const { free, models } = useOpenRouterModels();
+  const orModel = openrouter ? (settings.openrouterModel ? models.find((m) => m.id === settings.openrouterModel) : free[0]) : undefined;
   const rangeChars = source ? source.pages.slice(from - 1, to).reduce((n, p) => n + p.length, 0) : book.charCount;
   const tokens = book.mode === 'pdf' ? book.pageCount * 2500 : estimateTokens(rangeChars);
   const cost = estimateCost(tokens, settings.model);
-  const tooBig = tokens > 850_000;
   const validRange = from >= 1 && to <= book.pageCount && from <= to;
+  const tooBig = !openrouter && tokens > 850_000;
+  let reading: ReturnType<typeof planReading> | null = null;
+  if (openrouter && orModel && source && validRange) {
+    try {
+      reading = planReading(source.pages, { from, to }, orModel.context, orModel.maxOutput);
+    } catch {
+      reading = null;
+    }
+  }
+  const scannedOnOpenRouter = openrouter && book.mode === 'pdf';
 
   const start = async () => {
     setError(null);
@@ -209,13 +224,27 @@ function AnalyzePanel({ book, onStarted }: { book: BookRecord; onStarted: () => 
         <p className="field__hint">This PDF has no text layer, so Claude will read the page images directly. This costs more than a text PDF.</p>
       )}
 
-      <div className="analyze__estimate">
-        <span className="tabular">≈ {Math.round(tokens / 1000).toLocaleString()}k tokens</span>
-        <span className="tabular">≈ ${cost.toFixed(2)} with {MODELS.find((m) => m.id === settings.model)?.label}</span>
-        <span className="muted">Five sections: summary, mind map, insights, 7-day and 30-day plans. The book is cached so later sections cost less.</span>
-      </div>
+      {openrouter ? (
+        <div className="analyze__estimate">
+          <span className="tabular">≈ {Math.round(tokens / 1000).toLocaleString()}k tokens</span>
+          <span>{orModel ? `${orModel.name}${orModel.free ? ' · free' : ''}` : settings.openrouterModel || 'Best free model'}</span>
+          <span className="muted">
+            {reading && !reading.direct
+              ? `This model reads ${Math.round((orModel?.context ?? 0) / 1000)}k tokens at a time, so the book is first read in ${reading.parts.length} parts and condensed into notes (${reading.parts.length + 5} requests in all).`
+              : 'Five requests: summary, mind map, insights, 7-day and 30-day plans.'}{' '}
+            Free models allow about 50 requests a day.
+          </span>
+        </div>
+      ) : (
+        <div className="analyze__estimate">
+          <span className="tabular">≈ {Math.round(tokens / 1000).toLocaleString()}k tokens</span>
+          <span className="tabular">≈ ${cost.toFixed(2)} with {MODELS.find((m) => m.id === settings.model)?.label}</span>
+          <span className="muted">Five sections: summary, mind map, insights, 7-day and 30-day plans. The book is cached so later sections cost less.</span>
+        </div>
+      )}
 
-      {!settings.apiKey && <AiSettingsForm compact />}
+      {!hasKey(settings) && <AiSettingsForm compact />}
+      {scannedOnOpenRouter && <p className="dropzone__error">This PDF is scanned (no text layer). OpenRouter models need text, so run OCR on it first, or switch to Claude in Settings.</p>}
       {tooBig && <p className="dropzone__error">This range is larger than Claude's context window. Narrow the page range.</p>}
       {error && (
         <p className="dropzone__error" role="alert">
@@ -223,7 +252,7 @@ function AnalyzePanel({ book, onStarted }: { book: BookRecord; onStarted: () => 
         </p>
       )}
       <div className="analyze__actions">
-        <button type="button" className="btn btn--primary" disabled={!settings.apiKey || tooBig || !validRange} onClick={() => void start()}>
+        <button type="button" className="btn btn--primary" disabled={!hasKey(settings) || tooBig || !validRange || scannedOnOpenRouter} onClick={() => void start()}>
           <Icon name="sparkle" size={16} /> {anyDone ? 'Re-analyze everything' : 'Analyze book'}
         </button>
         <span className="muted">Takes a few minutes. You can keep using the app meanwhile.</span>
@@ -246,6 +275,11 @@ function Progress({ book }: { book: BookRecord }) {
   const retryable = statuses.some((s) => s.status !== 'done');
   return (
     <div className="run-status" role="status" aria-live="polite">
+      {live.stage && (
+        <p className="run-status__stage">
+          <span className="spinner spinner--sm" aria-hidden="true" /> {live.stage}…{live.stageChars ? <span className="muted tabular"> {(live.stageChars / 1000).toFixed(1)}k chars of notes</span> : null}
+        </p>
+      )}
       <ol className="run-status__steps">
         {statuses.map(({ id, status }) => (
           <li key={id} className={`run-step run-step--${status}`}>
@@ -254,7 +288,7 @@ function Progress({ book }: { book: BookRecord }) {
             </span>
             <span>{SECTION_LABELS[id]}</span>
             {status === 'running' && live.chars[id] ? <span className="muted tabular">{(live.chars[id]! / 1000).toFixed(1)}k chars</span> : null}
-            {status === 'running' && !live.chars[id] ? <span className="muted">reading…</span> : null}
+            {status === 'running' && !live.chars[id] && !live.stage ? <span className="muted">waiting…</span> : null}
             {status === 'error' && <span className="run-step__err">failed</span>}
           </li>
         ))}

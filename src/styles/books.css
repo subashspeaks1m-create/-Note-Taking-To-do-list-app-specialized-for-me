@@ -42,6 +42,7 @@
 
 .field input,
 .field textarea,
+.field select,
 .analyze__range input {
   width: 100%;
   min-height: 44px;
@@ -529,6 +530,21 @@
   border-radius: 14px;
   border: 1px solid var(--border-quiet);
   background: var(--surface);
+}
+
+.run-status__stage {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.spinner--sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
 }
 
 .run-status__steps {
