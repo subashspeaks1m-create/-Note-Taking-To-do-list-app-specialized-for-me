@@ -1,6 +1,9 @@
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useDisplayPrefs, type DisplayPrefs } from '../../app/displayPrefs';
 import { PageHeader, StageNote } from '../../components/Page';
 import { APP_NAME, PROFILE_DEFAULTS } from '../../domain/config';
+import { AiSettingsForm } from '../books/AiSettingsForm';
 
 function Choice<K extends keyof DisplayPrefs>({ label, prefKey, options }: { label: string; prefKey: K; options: { value: DisplayPrefs[K]; label: string }[] }) {
   const { prefs, setPref } = useDisplayPrefs();
@@ -21,6 +24,10 @@ function Choice<K extends keyof DisplayPrefs>({ label, prefKey, options }: { lab
 }
 
 export function SettingsPage() {
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [hash]);
   return (
     <div className="page page--narrow">
       <PageHeader overline={APP_NAME} title="Settings" />
@@ -51,6 +58,13 @@ export function SettingsPage() {
         <Choice label="Motion" prefKey="motion" options={[{ value: 'system', label: 'Match device' }, { value: 'full', label: 'Full' }, { value: 'reduced', label: 'Reduced' }]} />
         <Choice label="Character playback" prefKey="avatarPlayback" options={[{ value: 'auto', label: 'Animated' }, { value: 'still', label: 'Still image' }]} />
         <Choice label="Graphics" prefKey="lowGraphics" options={[{ value: false, label: 'Full' }, { value: true, label: 'Low' }]} />
+      </section>
+
+      <section id="ai" className="settings-group" aria-labelledby="sg-ai">
+        <h2 id="sg-ai" className="settings-group__title">
+          Book analysis (AI)
+        </h2>
+        <AiSettingsForm />
       </section>
 
       <StageNote stage={6}>Profile editing, sound, sprint dates, backup and restore, storage status and reset arrive in stage 6.</StageNote>
