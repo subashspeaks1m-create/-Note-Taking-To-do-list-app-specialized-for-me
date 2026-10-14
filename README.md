@@ -18,10 +18,30 @@ npm run build:review # sandbox-friendly build in dist-review/ (in-memory routing
 Development builds accept `?now=2026-12-31T10:00:00+05:30` to simulate another moment for
 checking date boundaries.
 
+## Books: turn a book into behavior change
+
+Open **Books** (in the rail, or **More** on mobile) and upload a book as a PDF, or as a .txt or .md file.
+The text is read on your device with pdf.js. When you click **Analyze**, Claude produces:
+
+- **Summary**: the book in one sentence, the big idea, a full summary, chapter-by-chapter notes,
+  key concepts, verbatim quotes with page numbers, and caveats.
+- **Mind map**: an interactive two-sided map you can fold, drag and zoom, plus an outline view.
+- **Insights**: the ideas that most change behavior, each with a from → to shift, one action,
+  an if-then plan, the likely obstacle and a reflection question. Also an identity statement, a
+  keystone habit, and lists of what to start, stop and keep doing.
+- **7-day and 30-day roadmaps**: dated daily checklists with evening check-ins. Today's actions
+  from every active plan also appear at the top of the Books page.
+
+Add your Claude API key under **Settings → Book analysis**. The key stays in this browser and
+requests go straight to Anthropic. Before analyzing you can set your goal for the book (it shapes
+the insights and plans) and the page range, and you see an estimated token count and cost. The
+book is sent once and cached, so the later sections cost less. Scanned PDFs without a text layer
+are sent as page images (up to 22 MB and 600 pages). Everything can be exported as Markdown.
+
 ## Stack
 
 React 19, TypeScript 5.9, Vite 8, React Router 7, Dexie 4 (IndexedDB, from stage 2),
-Vitest 5, Playwright for screenshots and browser checks. System fonts only.
+Anthropic TypeScript SDK and pdf.js (Books), Vitest 5, Playwright for screenshots and browser checks. System fonts only.
 
 ## Structure
 
@@ -31,7 +51,7 @@ src/
   date/       calendar-date math and the injectable clock
   domain/     product config and game rules (single module), plan math
   components/ shared UI (icons, progress, page parts)
-  features/   today, tasks, journal, visions, calendar, character, insights, settings
+  features/   today, tasks, journal, visions, calendar, character, insights, books, settings
   styles/     tokens and stylesheets
 public/assets  optimized kit media (see "Media")
 source-assets  original kit media, kept for provenance, not shipped

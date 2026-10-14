@@ -17,6 +17,7 @@ export const DESTINATIONS: readonly Destination[] = [
   { to: '/visions', label: 'Visions', icon: 'vision', mobilePrimary: true },
   { to: '/calendar', label: 'Calendar', icon: 'calendar', mobilePrimary: true },
   { to: '/journal', label: 'Journal', icon: 'journal', mobilePrimary: true },
+  { to: '/books', label: 'Books', icon: 'learning', mobilePrimary: false },
   { to: '/character', label: 'Character', icon: 'character', mobilePrimary: false },
   { to: '/insights', label: 'Insights', icon: 'insights', mobilePrimary: false },
   { to: '/settings', label: 'Settings', icon: 'settings', mobilePrimary: false },

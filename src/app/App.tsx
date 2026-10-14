@@ -1,5 +1,7 @@
 import { createBrowserRouter, createMemoryRouter, RouterProvider, type RouteObject } from 'react-router-dom';
 import { ClockProvider } from '../date/clock';
+import { BookPage } from '../features/books/BookPage';
+import { LibraryPage } from '../features/books/LibraryPage';
 import { CalendarPage } from '../features/calendar/CalendarPage';
 import { CharacterPage } from '../features/character/CharacterPage';
 import { InsightsPage } from '../features/insights/InsightsPage';
@@ -20,6 +22,8 @@ const routes: RouteObject[] = [
       { path: 'visions', element: <VisionsPage /> },
       { path: 'calendar', element: <CalendarPage /> },
       { path: 'journal', element: <JournalPage /> },
+      { path: 'books', element: <LibraryPage /> },
+      { path: 'books/:bookId', element: <BookPage /> },
       { path: 'character', element: <CharacterPage /> },
       { path: 'insights', element: <InsightsPage /> },
       { path: 'settings', element: <SettingsPage /> },
