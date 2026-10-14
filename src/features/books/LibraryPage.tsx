@@ -70,7 +70,7 @@ function Uploader() {
       if (book.scanned && (!book.pdf || book.pdf.size > MAX_PDF_BYTES || book.pages.length > 600)) {
         throw new Error('This PDF has no readable text layer (it looks scanned) and is too large to send as images. Run it through OCR first, then upload again.');
       }
-      const id = crypto.randomUUID();
+      const id = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
       const text = book.pages.join('\n');
       const now = Date.now();
       const record: BookRecord = {

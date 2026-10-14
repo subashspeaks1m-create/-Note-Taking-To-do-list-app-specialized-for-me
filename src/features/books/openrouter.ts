@@ -216,14 +216,15 @@ async function completeOnce(opts: CompleteOptions, format: 'schema' | 'json' | '
   });
   if (!res.ok || !res.body) throw explain(res.status, await res.text());
 
-  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
   let buffer = '';
   let text = '';
   let finish: string | null = null;
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
-    buffer += value;
+    buffer += decoder.decode(value, { stream: true });
     let nl: number;
     while ((nl = buffer.indexOf('\n')) >= 0) {
       const line = buffer.slice(0, nl).trim();
