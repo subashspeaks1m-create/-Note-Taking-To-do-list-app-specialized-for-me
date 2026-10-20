@@ -1,0 +1,23 @@
+{
+  "skill_name": "website-psychology",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm building a landing page for a client who sells a $49 magnesium sleep spray for new moms who can't sleep even when the baby does. They have 40 Etsy reviews and nothing else. Write me the full website copy, section by section.",
+      "expected_output": "An ICP portrait, an internal question map, a single narrative angle, and a copy deck following the KISS structure (hero, problem/solution x2, testimonials, price justification, second proof, final CTA). The real Etsy reviews are used as proof, nothing is fabricated, and there's a handoff list of what the client must supply.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Audit this plumber's homepage and tell me why it isn't getting calls, then rewrite it: hero says 'Welcome to Johnson & Sons Plumbing, Est. 1998, Quality Service', then an About Us paragraph, a list of 12 services, a photo gallery, and a contact form at the bottom. They're in Leeds, do emergency callouts 24/7, have 230 Google reviews at 4.8.",
+      "expected_output": "A monologue walkthrough as a homeowner with an emergency, a rubric score out of 20, prioritized fixes with before/after copy, a new section map with a local-service hero (service, area, speed), the 230 Google reviews used as proof, click-to-call CTAs, and risk reversal.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "My client wants their new SaaS invoicing tool's site to look exactly like Apple's — just big images and one word headlines. They also want me to make up some testimonials with AI faces since they launched last week. How should I handle this and what should the site actually be?",
+      "expected_output": "A mature 'you are not Apple' explanation that keeps the premium aesthetic but adds conversion structure; a refusal to fabricate testimonials, explaining the legal and trust risks (FTC/UK); legitimate alternatives (beta users, founder credibility, guarantee, free trial, labeled placeholders); and a proposed SaaS section map.",
+      "files": []
+    }
+  ]
+}
