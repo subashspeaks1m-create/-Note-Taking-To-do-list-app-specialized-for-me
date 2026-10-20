@@ -1,9 +1,9 @@
 ---
-name: website-psychology
-description: The psychology of why people buy from a website, and how to plan, write, structure, audit, and pitch websites that work as sales funnels. Use this whenever the user is planning, writing, building, redesigning, or reviewing a website, landing page, homepage, product page, or sales page for a business, including website copy, headlines, section order, finding the target audience or ICP, conversion rate optimization (CRO), testimonials and social proof, justifying a price on the page, or calls to action. Also use it with any other website-building skill (this one decides the story and copy, the other decides visuals and code), and when the user asks why a nice-looking site does not sell, wants a site like Dior, Apple, or Shopify, or wants to charge clients 3k to 10k dollars per website.
+name: psychology-of-website
+description: Psychology of Website. The psychology of why people buy from a website, and how to plan, write, structure, audit, and pitch websites that work as sales funnels. Use this whenever the user is planning, writing, building, redesigning, or reviewing a website, landing page, homepage, product page, or sales page for a business, including website copy, headlines, section order, finding the target audience or ICP, conversion rate optimization (CRO), testimonials and social proof, justifying a price on the page, or calls to action. Also use it with any other website-building skill (this one decides the story and copy, the other decides visuals and code), and when the user asks why a nice-looking site does not sell, wants a site like Dior, Apple, or Shopify, or wants to charge clients 3k to 10k dollars per website.
 ---
 
-# Website Psychology
+# Psychology of Website
 
 A website that makes money is a salesperson that never sleeps. Visitors arrive with a problem and a head full of doubts. The page sells when each section answers the next doubt *before* the visitor finishes thinking it. Nothing else matters as much: not 3D models, not scroll-triggered video, not motion graphics. Those can make a page memorable, but copy and structure are what make it sell.
 
