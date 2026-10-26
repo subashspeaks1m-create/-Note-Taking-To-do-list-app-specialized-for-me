@@ -1,0 +1,120 @@
+{
+  "_about": "Iconic Elevation style constants. Every value is traced to references/style-bible.md. Pixel values are for the 1080x1920 canvas.",
+  "canvas": { "w": 1080, "h": 1920, "fps": 30 },
+
+  "palette": {
+    "white": "#FFFFFF",
+    "lime": "#BCF148",
+    "lime_glow_bg": "#12280A",
+    "red": "#FF3B30",
+    "card_bg": "#121212",
+    "card_bg_alpha": 0.75,
+    "card_border": "#FFFFFF",
+    "card_border_alpha": 0.12,
+    "pill_dark": "#1A1A1A",
+    "ink": "#0B0B0B",
+    "caption_stroke": "#000000",
+    "gradient": "#000000"
+  },
+
+  "fonts": {
+    "display": { "family": "Anton", "file": "Anton-Regular.ttf", "cap_per_size": 0.496 },
+    "body": { "family": "Inter SemiBold", "file": "Inter-SemiBold.otf", "cap_per_size": 0.601 },
+    "body_bold": { "family": "Inter", "file": "Inter-Bold.otf", "cap_per_size": 0.601 }
+  },
+
+  "pacing": {
+    "max_pause_s": 0.15,
+    "pad_in_s": 0.04,
+    "pad_out_s": 0.06,
+    "splice_fade_ms": 8,
+    "fillers": ["um", "umm", "uh", "uhh", "uhm", "erm", "er", "ah", "ahh", "hmm", "mm", "mhm"],
+    "hook_window_s": 3.0,
+    "hook_max_shot_s": 1.7,
+    "body_max_shot_s": 3.2,
+    "min_shot_s": 0.6,
+    "punch_scale": 1.15,
+    "base_scale": 1.0,
+    "face_anchor_y": 0.38,
+    "hook_creep": [1.0, 1.03],
+    "broll_push": [1.0, 1.05],
+    "broll_ratio": 0.3,
+    "broll_min_s": 0.9,
+    "broll_max_s": 2.6,
+    "proof_flash_at_s": 0.9,
+    "proof_flash_len_s": 1.0
+  },
+
+  "captions": {
+    "bold": {
+      "font": "display",
+      "uppercase": true,
+      "cap_px": 74,
+      "center_y": 1340,
+      "max_words": 4,
+      "max_chars": 18,
+      "outline_px": 3,
+      "shadow_px": 4,
+      "shadow_alpha": 0.6,
+      "pop_from": 105,
+      "pop_ms": 70,
+      "highlight_every_n_chunks": 2
+    },
+    "clean": {
+      "font": "body",
+      "uppercase": false,
+      "cap_px": 44,
+      "center_y": 1530,
+      "max_words": 8,
+      "max_chars": 30,
+      "outline_px": 0,
+      "shadow_px": 2,
+      "shadow_alpha": 0.55
+    }
+  },
+
+  "hook_title": {
+    "kicker_cap_px": 50,
+    "headline_cap_px": 124,
+    "line_gap_px": 22,
+    "kicker_gap_px": 34,
+    "baseline_y": 1610,
+    "margin_x": 88,
+    "align": "left",
+    "gradient_from_y": 0.5,
+    "gradient_alpha": 0.82,
+    "pop_from": 108,
+    "pop_ms": 100,
+    "stagger_ms": 80,
+    "max_len_s": 3.0
+  },
+
+  "grade": {
+    "contrast": 1.08,
+    "saturation": 1.14,
+    "gamma": 0.98,
+    "brightness": -0.01,
+    "shadows_cool": 0.03,
+    "highlights_warm": 0.02,
+    "vignette_angle": 0.45,
+    "sharpen": 0.4,
+    "grain": 0
+  },
+
+  "audio": {
+    "voice_lufs": -14,
+    "voice_tp": -1.0,
+    "music_rel_db": -16,
+    "duck_threshold": 0.1,
+    "duck_ratio": 2,
+    "music_bpm": 118,
+    "sfx_db": {
+      "pop": -16,
+      "tick": -20,
+      "whoosh": -18,
+      "thud": -11,
+      "riser": -20,
+      "shutter": -18
+    }
+  }
+}
