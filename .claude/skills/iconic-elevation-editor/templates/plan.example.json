@@ -1,0 +1,37 @@
+{
+  "_comment": "Edit plan for iconic_edit.py --plan. Anchor anything to spoken words with 'at' (phrase, matched after filler removal) and end it with 'dur' (s), 'until' (phrase) or 'end' (s, -1 = video end). Numbers instead of phrases are output-timeline seconds. Phrases here match scripts/make_test_clip.py so this file doubles as the regression fixture.",
+
+  "hook": {
+    "kicker": ["AT 18 I TORE UP", "MY OWN CONTRACT"],
+    "headline": ["NOT FOR A", "BETTER OFFER."],
+    "lime_lines": [1],
+    "sub": "",
+    "arrow": true,
+    "align": "left",
+    "dur": 3.0
+  },
+
+  "captions": {
+    "style": "bold",
+    "highlight": "keyword",
+    "keywords": ["contract", "seconds", "pathway"],
+    "during_hook": false
+  },
+
+  "broll": [
+    { "at": "Scouts close your reel", "dur": 1.6, "file": "test_assets/broll/clip1.mp4", "from": 1.0 },
+    { "at": "Most players", "dur": 1.4, "file": "test_assets/broll/clip2.mp4", "layout": "split" },
+    { "at": "Because I was", "dur": 1.0, "file": "test_assets/broll/photo.jpg" }
+  ],
+
+  "overlays": [
+    { "type": "card", "at": "eight seconds", "dur": 2.0, "kicker": "SCOUTS CLOSE YOUR REEL IN", "title": "8 SECONDS", "icon": "clock", "position": "top" },
+    { "type": "pill", "at": "film it wrong", "dur": 1.4, "left": "FILMED", "right": "WRONG" },
+    { "type": "rulecard", "at": "Rule one", "dur": 0.9, "number": "01", "subtitle": "Get to the point" },
+    { "type": "rulecard", "at": "Rule two", "dur": 0.9, "number": "02", "subtitle": "No slow-mo. Ever." },
+    { "type": "checklist", "at": "Rule three", "until": "Instrumentals only", "title": "WHAT SCOUTS HEAR", "items": [["LYRICS", "x"], ["SLOW-MO", "x"], ["INSTRUMENTALS", "check"]] },
+    { "type": "card", "at": "three rules", "dur": 1.6, "kicker": "HERE ARE", "title": "3 RULES", "icon": "bolt", "position": "upper-right" }
+  ],
+
+  "cta": { "type": "dm", "keyword": "PATHWAY" }
+}
